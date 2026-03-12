@@ -77,7 +77,7 @@ export default function MajorRequirementsPanel({ major, schedule, onClose, onHig
       <div className="panel panel-major" onClick={e => e.stopPropagation()}>
         <div className="panel-header">
           <h2>{major.name} Requirements</h2>
-          <button className="close-btn" onClick={onClose}>✕</button>
+          <button className="close-btn" onClick={onClose}>×</button>
         </div>
 
         <div className="major-summary">

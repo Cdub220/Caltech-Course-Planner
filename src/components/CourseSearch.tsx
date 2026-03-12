@@ -8,6 +8,9 @@ interface Props {
   scheduledCourseIds: Set<string>;
   onDragStart: (payload: DragPayload) => void;
   onDragEnd: () => void;
+  customCourses: Course[];
+  onOpenCustomModal: () => void;
+  onRemoveCustomCourse: (id: string) => void;
 }
 
 const YEARS = ['Freshman', 'Sophomore', 'Junior', 'Senior'] as const;
@@ -21,10 +24,13 @@ const DEPT_COLORS: Record<string, string> = {
   ACM: '#6d28d9', En: '#be185d', H: '#9f1239', Pl: '#7e22ce',
   PS: '#1d4ed8', Psy: '#0e7490', SS: '#4338ca', SEC: '#475569',
   PE: '#15803d', APh: '#1e40af', ESE: '#047857', ChE: '#b91c1c',
-  MS: '#6b7280', CNS: '#8b5cf6', IDS: '#0369a1',
+  MS: '#6b7280', CNS: '#8b5cf6', IDS: '#0369a1', Custom: '#64748b',
 };
 
-export default function CourseSearch({ onAddCourse, scheduledCourseIds, onDragStart, onDragEnd }: Props) {
+export default function CourseSearch({
+  onAddCourse, scheduledCourseIds, onDragStart, onDragEnd,
+  customCourses, onOpenCustomModal, onRemoveCustomCourse,
+}: Props) {
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
   const [addTarget, setAddTarget] = useState<{ year: string; term: Term }>({
@@ -32,10 +38,12 @@ export default function CourseSearch({ onAddCourse, scheduledCourseIds, onDragSt
     term: 'FA',
   });
 
+  const allCourses = useMemo(() => [...COURSES, ...customCourses], [customCourses]);
+
   const filtered = useMemo(() => {
     if (!search && !deptFilter) return [];
     const q = search.toLowerCase();
-    return COURSES.filter(c => {
+    return allCourses.filter(c => {
       const matchesSearch =
         !q ||
         c.number.toLowerCase().includes(q) ||
@@ -44,7 +52,7 @@ export default function CourseSearch({ onAddCourse, scheduledCourseIds, onDragSt
       const matchesDept = !deptFilter || c.department === deptFilter;
       return matchesSearch && matchesDept;
     });
-  }, [search, deptFilter]);
+  }, [search, deptFilter, allCourses]);
 
   const depts = useMemo(
     () => [...new Set(COURSES.map(c => c.department))].sort(),
@@ -56,13 +64,13 @@ export default function CourseSearch({ onAddCourse, scheduledCourseIds, onDragSt
       <div className="search-header">
         <h2 className="search-title">Course Catalog</h2>
         <span className="search-count">
-          {search || deptFilter ? `${filtered.length} found` : `${COURSES.length} total`}
+          {search || deptFilter ? `${filtered.length} found` : `${allCourses.length} total`}
         </span>
       </div>
 
       <div className="search-controls">
         <div className="search-input-wrap">
-          <span className="search-icon">🔍</span>
+          <span className="search-icon">&#128269;</span>
           <input
             className="search-input"
             type="text"
@@ -105,29 +113,39 @@ export default function CourseSearch({ onAddCourse, scheduledCourseIds, onDragSt
       </div>
 
       <div className="drag-hint">
-        <span>⇄ Drag cards onto the schedule</span>
+        <span>Drag cards onto the schedule</span>
       </div>
+
+      <button className="add-custom-course-btn" onClick={onOpenCustomModal}>
+        + Create Custom Course
+      </button>
 
       <div className="course-list">
         {!search && !deptFilter && (
           <div className="no-results">
-            <span className="no-results-icon">🔍</span>
             <p>Search or filter by department to browse courses</p>
+            {customCourses.length > 0 && (
+              <p style={{ marginTop: 8, fontSize: 11, color: '#64748b' }}>
+                {customCourses.length} custom course{customCourses.length !== 1 ? 's' : ''} — search to see them
+              </p>
+            )}
           </div>
         )}
         {(search || deptFilter) && filtered.length === 0 && (
           <div className="no-results">
-            <span className="no-results-icon">🔭</span>
             <p>No courses found</p>
           </div>
         )}
         {filtered.map(course => {
           const scheduled = scheduledCourseIds.has(course.id);
           const deptColor = DEPT_COLORS[course.department] ?? '#64748b';
+          const timeStr = course.meetingTime
+            ? `${course.meetingTime.days} ${course.meetingTime.start}–${course.meetingTime.end}`
+            : null;
           return (
             <div
               key={course.id}
-              className={`course-card ${scheduled ? 'scheduled' : ''}`}
+              className={`course-card ${scheduled ? 'scheduled' : ''} ${course.isCustom ? 'custom-course-card' : ''}`}
               draggable
               onDragStart={e => {
                 e.dataTransfer.effectAllowed = 'copy';
@@ -141,10 +159,22 @@ export default function CourseSearch({ onAddCourse, scheduledCourseIds, onDragSt
                 <div className="course-card-top">
                   <span className="course-number" style={{ color: deptColor }}>{course.number}</span>
                   <span className="course-units-pill">{course.units}u</span>
+                  {course.isCustom && (
+                    <button
+                      className="remove-custom-btn"
+                      title="Delete custom course"
+                      onClick={e => { e.stopPropagation(); onRemoveCustomCourse(course.id); }}
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
                 <div className="course-card-name" title={course.name}>{course.name}</div>
                 <div className="course-card-footer">
-                  <span className="course-terms-small">{course.terms.join(' · ')}</span>
+                  <div className="course-card-meta">
+                    <span className="course-terms-small">{course.terms.join(' · ')}</span>
+                    {timeStr && <span className="course-time-small">{timeStr}</span>}
+                  </div>
                   <button
                     className={`add-btn ${scheduled ? 'added' : ''}`}
                     title={`Add to ${addTarget.year} ${TERM_LABELS[addTarget.term]}`}

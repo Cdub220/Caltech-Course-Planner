@@ -76,7 +76,7 @@ export default function CoreRequirementsPanel({ schedule, onClose }: Props) {
       <div className="panel" onClick={e => e.stopPropagation()}>
         <div className="panel-header">
           <h2>Core Requirements</h2>
-          <button className="close-btn" onClick={onClose}>✕</button>
+          <button className="close-btn" onClick={onClose}>×</button>
         </div>
 
         <div className="panel-body">

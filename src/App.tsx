@@ -8,6 +8,7 @@ import ScheduleGrid from './components/ScheduleGrid';
 import CoreRequirementsPanel from './components/CoreRequirementsPanel';
 import MajorRequirementsPanel from './components/MajorRequirementsPanel';
 import AuthModal from './components/AuthModal';
+import CustomCourseModal from './components/CustomCourseModal';
 import SaveStatus, { type SaveState } from './components/SaveStatus';
 import './App.css';
 
@@ -29,12 +30,14 @@ export default function App() {
   const auth = useAuth();
 
   const [schedule, setSchedule] = useState<Schedule>(emptySchedule());
+  const [customCourses, setCustomCourses] = useState<Course[]>([]);
   const [selectedMajorId, setSelectedMajorId] = useState('');
   const [selectedMinorId, setSelectedMinorId] = useState('');
   const [showCore, setShowCore] = useState(false);
   const [showMajor, setShowMajor] = useState(false);
   const [showMinor, setShowMinor] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
+  const [showCustomModal, setShowCustomModal] = useState(false);
   const [highlightedCourses, setHighlightedCourses] = useState<Set<string>>(new Set());
   const [dragPayload, setDragPayload] = useState<DragPayload | null>(null);
   const [saveState, setSaveState] = useState<SaveState>('idle');
@@ -45,8 +48,9 @@ export default function App() {
     if (auth.status !== 'authed' || !auth.user) return;
     loadSchedule(auth.user.id).then(result => {
       if (!result.ok || !result.data) return;
-      const { schedule_data, major_id, minor_id, id } = result.data;
-      setSchedule(schedule_data as Schedule);
+      const { schedule, customCourses: cc, major_id, minor_id, id } = result.data;
+      setSchedule(schedule);
+      setCustomCourses(cc);
       setSelectedMajorId(major_id ?? '');
       setSelectedMinorId(minor_id ?? '');
       setScheduleId(id);
@@ -57,6 +61,7 @@ export default function App() {
   useEffect(() => {
     if (auth.status === 'anon') {
       setSchedule(emptySchedule());
+      setCustomCourses([]);
       setSelectedMajorId('');
       setSelectedMinorId('');
       setScheduleId(undefined);
@@ -69,12 +74,12 @@ export default function App() {
   const isFirstRender = useRef(true);
 
   const triggerSave = useCallback(
-    (sched: Schedule, majorId: string, minorId: string, sid: string | undefined) => {
+    (sched: Schedule, cc: Course[], majorId: string, minorId: string, sid: string | undefined) => {
       if (!auth.user) return;
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       setSaveState('saving');
       saveTimerRef.current = setTimeout(async () => {
-        const result = await saveSchedule(auth.user!.id, sched, majorId, minorId, sid);
+        const result = await saveSchedule(auth.user!.id, sched, cc, majorId, minorId, sid);
         if (result.ok) {
           setScheduleId(result.id);
           setSaveState('saved');
@@ -90,14 +95,14 @@ export default function App() {
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return; }
     if (auth.status !== 'authed') return;
-    triggerSave(schedule, selectedMajorId, selectedMinorId, scheduleId);
-  }, [schedule, selectedMajorId, selectedMinorId]); // eslint-disable-line react-hooks/exhaustive-deps
+    triggerSave(schedule, customCourses, selectedMajorId, selectedMinorId, scheduleId);
+  }, [schedule, customCourses, selectedMajorId, selectedMinorId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleManualSave = () => {
     if (!auth.user) { setShowAuth(true); return; }
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     setSaveState('saving');
-    saveSchedule(auth.user.id, schedule, selectedMajorId, selectedMinorId, scheduleId).then(result => {
+    saveSchedule(auth.user.id, schedule, customCourses, selectedMajorId, selectedMinorId, scheduleId).then(result => {
       if (result.ok) {
         setScheduleId(result.id);
         setSaveState('saved');
@@ -156,6 +161,14 @@ export default function App() {
     });
   };
 
+  const handleAddCustomCourse = (course: Course) => {
+    setCustomCourses(prev => [...prev, course]);
+  };
+
+  const handleRemoveCustomCourse = (id: string) => {
+    setCustomCourses(prev => prev.filter(c => c.id !== id));
+  };
+
   const selectedMajor = MAJORS.find(m => m.id === selectedMajorId);
   const selectedMinor = MINORS.find(m => m.id === selectedMinorId);
 
@@ -165,10 +178,11 @@ export default function App() {
       <header className="topbar">
         <div className="topbar-left">
           <div className="topbar-brand">
-            <span className="topbar-logo">🧪</span>
+            <img src="/beaver.png" className="topbar-logo-img" alt="Caltech Planner" />
             <div>
               <h1 className="topbar-title">Caltech Course Planner</h1>
               <span className="topbar-sub">4-Year Schedule Builder</span>
+              <span className="topbar-credit">Created by Chase Williamson '28</span>
             </div>
           </div>
         </div>
@@ -205,7 +219,7 @@ export default function App() {
           </div>
 
           <button className="core-req-btn" onClick={() => setShowCore(true)}>
-            <span className="btn-icon">📋</span>Core Requirements
+            Core Requirements
           </button>
 
           {/* Auth / Save controls */}
@@ -215,12 +229,12 @@ export default function App() {
               <div className="user-pill">
                 <span className="user-avatar">{auth.user?.email?.[0].toUpperCase()}</span>
                 <span className="user-email">{auth.user?.email}</span>
-                <button className="signout-btn" onClick={auth.signOut} title="Sign out">↩</button>
+                <button className="signout-btn" onClick={auth.signOut} title="Sign out">Sign out</button>
               </div>
             </div>
           ) : auth.status === 'anon' ? (
             <button className="login-btn" onClick={() => setShowAuth(true)}>
-              <span>🔐</span> Log in to save
+              Log in to save
             </button>
           ) : null /* loading */}
         </div>
@@ -233,6 +247,9 @@ export default function App() {
           scheduledCourseIds={scheduledCourseIds}
           onDragStart={setDragPayload}
           onDragEnd={() => setDragPayload(null)}
+          customCourses={customCourses}
+          onOpenCustomModal={() => setShowCustomModal(true)}
+          onRemoveCustomCourse={handleRemoveCustomCourse}
         />
         <main className="schedule-main">
           <ScheduleGrid
@@ -243,6 +260,7 @@ export default function App() {
             dragPayload={dragPayload}
             onDragStart={setDragPayload}
             onDragEnd={() => setDragPayload(null)}
+            customCourses={customCourses}
           />
         </main>
       </div>
@@ -264,6 +282,7 @@ export default function App() {
         />
       )}
       {showAuth && <AuthModal onClose={() => setShowAuth(false)} actions={auth} />}
+      {showCustomModal && <CustomCourseModal onClose={() => setShowCustomModal(false)} onAdd={handleAddCustomCourse} />}
     </div>
   );
 }

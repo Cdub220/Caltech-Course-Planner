@@ -110,6 +110,14 @@ select, input { font-family: inherit; }
   text-transform: uppercase;
 }
 
+.topbar-credit {
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.55;
+  display: block;
+  margin-top: 1px;
+}
+
 .topbar-controls {
   display: flex;
   align-items: center;
@@ -1437,4 +1445,188 @@ select, input { font-family: inherit; }
   padding: 10px 24px 16px;
   border-top: 1px solid var(--border-light);
   background: var(--bg);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TOPBAR LOGO IMAGE
+   ══════════════════════════════════════════════════════════════ */
+.topbar-logo-img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.auth-logo-img {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TIME SLOT GROUPING (ScheduleGrid)
+   ══════════════════════════════════════════════════════════════ */
+.time-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.time-group + .time-group {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border-light);
+}
+
+.time-group-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding: 0 2px 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.time-group-label--none {
+  color: var(--border);
+  font-style: italic;
+}
+
+.scheduled-course.conflict {
+  border-left: 2px solid #f97316;
+}
+
+.sc-conflict-icon {
+  font-size: 9px;
+  font-weight: 800;
+  color: #f97316;
+  margin-right: 1px;
+  flex-shrink: 0;
+}
+
+.term-conflict-badge {
+  font-size: 9px;
+  font-weight: 700;
+  color: #f97316;
+  background: rgba(249,115,22,0.12);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CUSTOM COURSE BUTTON & CARDS
+   ══════════════════════════════════════════════════════════════ */
+.add-custom-course-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: calc(100% - 24px);
+  margin: 0 12px 8px;
+  padding: 7px 12px;
+  background: white;
+  border: 1.5px dashed var(--orange);
+  border-radius: var(--radius-sm);
+  color: var(--orange-dark);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.add-custom-course-btn:hover {
+  background: var(--orange-glow);
+  border-style: solid;
+}
+
+.custom-course-card {
+  border: 1px solid rgba(99,102,241,0.3);
+  background: rgba(99,102,241,0.03);
+}
+
+.remove-custom-btn {
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.remove-custom-btn:hover { opacity: 0.7; }
+
+.course-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.course-time-small {
+  font-size: 9px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.custom-course-modal {
+  max-width: 520px;
+}
+
+.custom-course-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.term-toggle-row {
+  display: flex;
+  gap: 8px;
+}
+
+.term-toggle-btn {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: white;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.term-toggle-btn.active {
+  border-color: var(--orange);
+  background: var(--orange-glow);
+  color: var(--orange-dark);
+}
+
+/* Signout button text update */
+.signout-btn {
+  font-size: 10px !important;
+  padding: 1px 4px !important;
+}
+
+/* Footer */
+.app-footer {
+  text-align: center;
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  background: var(--bg-surface);
 }

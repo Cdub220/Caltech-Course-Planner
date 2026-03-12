@@ -99,12 +99,12 @@ export default function AuthModal({ onClose, actions }: Props) {
       <div className="auth-modal" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="auth-header">
-          <div className="auth-logo">🧪</div>
+          <img src="/beaver.png" className="auth-logo-img" alt="" />
           <h2 className="auth-title">
             {mode === 'login' ? 'Welcome back' : mode === 'signup' ? 'Create account' : 'Reset password'}
           </h2>
           <p className="auth-subtitle">Caltech Course Planner</p>
-          <button className="auth-close" onClick={onClose} aria-label="Close">✕</button>
+          <button className="auth-close" onClick={onClose} aria-label="Close">×</button>
         </div>
 
         {/* Tabs */}
@@ -176,7 +176,7 @@ export default function AuthModal({ onClose, actions }: Props) {
                   onClick={() => setShowPw(s => !s)}
                   aria-label={showPw ? 'Hide password' : 'Show password'}
                 >
-                  {showPw ? '🙈' : '👁'}
+                  {showPw ? 'Hide' : 'Show'}
                 </button>
               </div>
 

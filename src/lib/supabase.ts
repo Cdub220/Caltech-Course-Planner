@@ -24,7 +24,7 @@ export interface DbSchedule {
   id: string;
   user_id: string;
   name: string;
-  schedule_data: Record<string, Record<string, string[]>>;
+  schedule_data: unknown; // may be Schedule directly (legacy) or { schedule, customCourses }
   major_id: string;
   minor_id: string;
   updated_at: string;

@@ -3,10 +3,10 @@ export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 interface Props { state: SaveState; onSave: () => void; }
 
 const CONFIG: Record<SaveState, { icon: string; label: string; cls: string }> = {
-  idle:   { icon: '💾', label: 'Save',        cls: '' },
-  saving: { icon: '⟳',  label: 'Saving…',     cls: 'saving' },
+  idle:   { icon: '↓',  label: 'Save',        cls: '' },
+  saving: { icon: '…',  label: 'Saving…',     cls: 'saving' },
   saved:  { icon: '✓',  label: 'Saved',        cls: 'saved' },
-  error:  { icon: '⚠',  label: 'Save failed',  cls: 'error' },
+  error:  { icon: '!',  label: 'Save failed',  cls: 'error' },
 };
 
 export default function SaveStatus({ state, onSave }: Props) {
