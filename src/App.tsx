@@ -1,38 +1,119 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import type { Course, Schedule, Term } from './types';
 import { MAJORS, MINORS } from './data/majorRequirements';
+import { useAuth } from './hooks/useAuth';
+import { saveSchedule, loadSchedule } from './lib/db';
 import CourseSearch from './components/CourseSearch';
 import ScheduleGrid from './components/ScheduleGrid';
 import CoreRequirementsPanel from './components/CoreRequirementsPanel';
 import MajorRequirementsPanel from './components/MajorRequirementsPanel';
+import AuthModal from './components/AuthModal';
+import SaveStatus, { type SaveState } from './components/SaveStatus';
 import './App.css';
 
 const YEARS = ['Freshman', 'Sophomore', 'Junior', 'Senior'];
 
+export interface DragPayload {
+  courseId: string;
+  fromYear?: string;
+  fromTerm?: Term;
+}
+
 function emptySchedule(): Schedule {
   const s: Schedule = {};
-  for (const y of YEARS) {
-    s[y] = { FA: [], WI: [], SP: [] };
-  }
+  for (const y of YEARS) s[y] = { FA: [], WI: [], SP: [] };
   return s;
 }
 
 export default function App() {
+  const auth = useAuth();
+
   const [schedule, setSchedule] = useState<Schedule>(emptySchedule());
   const [selectedMajorId, setSelectedMajorId] = useState('');
   const [selectedMinorId, setSelectedMinorId] = useState('');
   const [showCore, setShowCore] = useState(false);
   const [showMajor, setShowMajor] = useState(false);
   const [showMinor, setShowMinor] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
   const [highlightedCourses, setHighlightedCourses] = useState<Set<string>>(new Set());
+  const [dragPayload, setDragPayload] = useState<DragPayload | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [scheduleId, setScheduleId] = useState<string | undefined>();
 
+  // ── Load schedule when user logs in ──────────────────────────────
+  useEffect(() => {
+    if (auth.status !== 'authed' || !auth.user) return;
+    loadSchedule(auth.user.id).then(result => {
+      if (!result.ok || !result.data) return;
+      const { schedule_data, major_id, minor_id, id } = result.data;
+      setSchedule(schedule_data as Schedule);
+      setSelectedMajorId(major_id ?? '');
+      setSelectedMinorId(minor_id ?? '');
+      setScheduleId(id);
+    });
+  }, [auth.status, auth.user]);
+
+  // Reset when user logs out
+  useEffect(() => {
+    if (auth.status === 'anon') {
+      setSchedule(emptySchedule());
+      setSelectedMajorId('');
+      setSelectedMinorId('');
+      setScheduleId(undefined);
+      setSaveState('idle');
+    }
+  }, [auth.status]);
+
+  // ── Auto-save (debounced 2s after any change) ─────────────────────
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstRender = useRef(true);
+
+  const triggerSave = useCallback(
+    (sched: Schedule, majorId: string, minorId: string, sid: string | undefined) => {
+      if (!auth.user) return;
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      setSaveState('saving');
+      saveTimerRef.current = setTimeout(async () => {
+        const result = await saveSchedule(auth.user!.id, sched, majorId, minorId, sid);
+        if (result.ok) {
+          setScheduleId(result.id);
+          setSaveState('saved');
+          setTimeout(() => setSaveState('idle'), 2500);
+        } else {
+          setSaveState('error');
+        }
+      }, 2000);
+    },
+    [auth.user]
+  );
+
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    if (auth.status !== 'authed') return;
+    triggerSave(schedule, selectedMajorId, selectedMinorId, scheduleId);
+  }, [schedule, selectedMajorId, selectedMinorId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleManualSave = () => {
+    if (!auth.user) { setShowAuth(true); return; }
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    setSaveState('saving');
+    saveSchedule(auth.user.id, schedule, selectedMajorId, selectedMinorId, scheduleId).then(result => {
+      if (result.ok) {
+        setScheduleId(result.id);
+        setSaveState('saved');
+        setTimeout(() => setSaveState('idle'), 2500);
+      } else {
+        setSaveState('error');
+      }
+    });
+  };
+
+  // ── Schedule mutations ────────────────────────────────────────────
   const scheduledCourseIds = useMemo(() => {
     const ids = new Set<string>();
-    for (const terms of Object.values(schedule)) {
-      for (const courseIds of Object.values(terms)) {
+    for (const terms of Object.values(schedule))
+      for (const courseIds of Object.values(terms))
         for (const id of courseIds) ids.add(id);
-      }
-    }
     return ids;
   }, [schedule]);
 
@@ -41,9 +122,7 @@ export default function App() {
       const updated = { ...prev };
       const yearTerms = { ...updated[year] };
       const termCourses = [...(yearTerms[term] ?? [])];
-      if (!termCourses.includes(course.id)) {
-        termCourses.push(course.id);
-      }
+      if (!termCourses.includes(course.id)) termCourses.push(course.id);
       yearTerms[term] = termCourses;
       updated[year] = yearTerms;
       return updated;
@@ -60,125 +139,131 @@ export default function App() {
     });
   };
 
+  const handleDrop = (toYear: string, toTerm: Term, payload: DragPayload) => {
+    const { courseId, fromYear, fromTerm } = payload;
+    setSchedule(prev => {
+      const updated: Schedule = {};
+      for (const y of YEARS) {
+        updated[y] = {};
+        for (const t of ['FA', 'WI', 'SP'] as Term[])
+          updated[y][t] = [...(prev[y]?.[t] ?? [])];
+      }
+      if (fromYear && fromTerm)
+        updated[fromYear][fromTerm] = updated[fromYear][fromTerm].filter(id => id !== courseId);
+      if (!updated[toYear][toTerm].includes(courseId))
+        updated[toYear][toTerm] = [...updated[toYear][toTerm], courseId];
+      return updated;
+    });
+  };
+
   const selectedMajor = MAJORS.find(m => m.id === selectedMajorId);
   const selectedMinor = MINORS.find(m => m.id === selectedMinorId);
 
   return (
     <div className="app">
-      {/* ── TOP BAR ─────────────────────────────────── */}
+      {/* ── TOP BAR ───────────────────────────────────────── */}
       <header className="topbar">
         <div className="topbar-left">
-          <span className="topbar-logo">🧪</span>
-          <h1 className="topbar-title">Caltech Course Planner</h1>
+          <div className="topbar-brand">
+            <span className="topbar-logo">🧪</span>
+            <div>
+              <h1 className="topbar-title">Caltech Course Planner</h1>
+              <span className="topbar-sub">4-Year Schedule Builder</span>
+            </div>
+          </div>
         </div>
 
         <div className="topbar-controls">
-          {/* Major selector */}
           <div className="selector-group">
             <label className="selector-label">Major</label>
             <select
               className="selector-select"
               value={selectedMajorId}
-              onChange={e => {
-                setSelectedMajorId(e.target.value);
-                setShowMajor(false);
-              }}
+              onChange={e => { setSelectedMajorId(e.target.value); setShowMajor(false); }}
             >
               <option value="">— Select major —</option>
-              {MAJORS.map(m => (
-                <option key={m.id} value={m.id}>
-                  {m.name} ({m.abbreviation})
-                </option>
-              ))}
+              {MAJORS.map(m => <option key={m.id} value={m.id}>{m.name} ({m.abbreviation})</option>)}
             </select>
             {selectedMajorId && (
-              <button
-                className="view-req-btn"
-                onClick={() => setShowMajor(true)}
-              >
-                View Requirements
-              </button>
+              <button className="view-req-btn" onClick={() => setShowMajor(true)}>Requirements</button>
             )}
           </div>
 
-          {/* Minor selector */}
           <div className="selector-group">
             <label className="selector-label">Minor</label>
             <select
               className="selector-select"
               value={selectedMinorId}
-              onChange={e => {
-                setSelectedMinorId(e.target.value);
-                setShowMinor(false);
-              }}
+              onChange={e => { setSelectedMinorId(e.target.value); setShowMinor(false); }}
             >
               <option value="">— Select minor —</option>
-              {MINORS.map(m => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
+              {MINORS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
             {selectedMinorId && (
-              <button
-                className="view-req-btn"
-                onClick={() => setShowMinor(true)}
-              >
-                View Requirements
-              </button>
+              <button className="view-req-btn" onClick={() => setShowMinor(true)}>Requirements</button>
             )}
           </div>
 
-          <button
-            className="core-req-btn"
-            onClick={() => setShowCore(true)}
-          >
-            Core Requirements
+          <button className="core-req-btn" onClick={() => setShowCore(true)}>
+            <span className="btn-icon">📋</span>Core Requirements
           </button>
+
+          {/* Auth / Save controls */}
+          {auth.status === 'authed' ? (
+            <div className="topbar-user-area">
+              <SaveStatus state={saveState} onSave={handleManualSave} />
+              <div className="user-pill">
+                <span className="user-avatar">{auth.user?.email?.[0].toUpperCase()}</span>
+                <span className="user-email">{auth.user?.email}</span>
+                <button className="signout-btn" onClick={auth.signOut} title="Sign out">↩</button>
+              </div>
+            </div>
+          ) : auth.status === 'anon' ? (
+            <button className="login-btn" onClick={() => setShowAuth(true)}>
+              <span>🔐</span> Log in to save
+            </button>
+          ) : null /* loading */}
         </div>
       </header>
 
-      {/* ── MAIN LAYOUT ─────────────────────────────── */}
+      {/* ── MAIN ──────────────────────────────────────────── */}
       <div className="main-layout">
         <CourseSearch
           onAddCourse={handleAddCourse}
           scheduledCourseIds={scheduledCourseIds}
+          onDragStart={setDragPayload}
+          onDragEnd={() => setDragPayload(null)}
         />
-
         <main className="schedule-main">
           <ScheduleGrid
             schedule={schedule}
             onRemoveCourse={handleRemoveCourse}
+            onDrop={handleDrop}
             highlightedCourses={highlightedCourses}
+            dragPayload={dragPayload}
+            onDragStart={setDragPayload}
+            onDragEnd={() => setDragPayload(null)}
           />
         </main>
       </div>
 
-      {/* ── PANELS ──────────────────────────────────── */}
-      {showCore && (
-        <CoreRequirementsPanel
-          schedule={schedule}
-          onClose={() => setShowCore(false)}
-        />
-      )}
-
+      {/* ── OVERLAYS ──────────────────────────────────────── */}
+      {showCore && <CoreRequirementsPanel schedule={schedule} onClose={() => setShowCore(false)} />}
       {showMajor && selectedMajor && (
         <MajorRequirementsPanel
-          major={selectedMajor}
-          schedule={schedule}
+          major={selectedMajor} schedule={schedule}
           onClose={() => { setShowMajor(false); setHighlightedCourses(new Set()); }}
           onHighlightCourses={setHighlightedCourses}
         />
       )}
-
       {showMinor && selectedMinor && (
         <MajorRequirementsPanel
-          major={selectedMinor}
-          schedule={schedule}
+          major={selectedMinor} schedule={schedule}
           onClose={() => { setShowMinor(false); setHighlightedCourses(new Set()); }}
           onHighlightCourses={setHighlightedCourses}
         />
       )}
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} actions={auth} />}
     </div>
   );
 }
