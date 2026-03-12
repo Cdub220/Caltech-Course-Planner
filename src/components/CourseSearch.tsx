@@ -42,14 +42,19 @@ export default function CourseSearch({
 
   const filtered = useMemo(() => {
     if (!search && !deptFilter) return [];
-    const q = search.toLowerCase();
+    const q = search.toLowerCase().trim();
+    const qNoSpace = q.replace(/\s+/g, '');
     return allCourses.filter(c => {
+      const numLower = c.number.toLowerCase();
+      const numNoSpace = numLower.replace(/\s+/g, '');
       const matchesSearch =
         !q ||
-        c.number.toLowerCase().includes(q) ||
+        numNoSpace.includes(qNoSpace) ||
+        numLower.includes(q) ||
         c.name.toLowerCase().includes(q) ||
         c.department.toLowerCase().includes(q);
-      const matchesDept = !deptFilter || c.department === deptFilter;
+      const numPrefixes = c.number.split(/[\s/]/).map(s => s.toUpperCase());
+      const matchesDept = !deptFilter || c.department === deptFilter || numPrefixes.includes(deptFilter.toUpperCase());
       return matchesSearch && matchesDept;
     });
   }, [search, deptFilter, allCourses]);

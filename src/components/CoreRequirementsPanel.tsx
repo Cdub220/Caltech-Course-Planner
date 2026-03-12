@@ -54,13 +54,15 @@ interface BarProps {
 function ProgressBar({ pct, earned, required }: BarProps) {
   const done = pct >= 1;
   return (
-    <div className="req-bar-wrap">
-      <div
-        className={`req-bar-fill ${done ? 'complete' : ''}`}
-        style={{ width: `${Math.min(pct * 100, 100)}%` }}
-      />
-      <span className="req-bar-label">
-        {earned}/{required} units
+    <div>
+      <div className="req-bar-wrap">
+        <div
+          className={`req-bar-fill ${done ? 'complete' : ''}`}
+          style={{ width: `${Math.min(pct * 100, 100)}%` }}
+        />
+      </div>
+      <span className="req-bar-units-text">
+        {earned} / {required} units
       </span>
     </div>
   );

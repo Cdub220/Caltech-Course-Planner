@@ -655,12 +655,13 @@ select, input { font-family: inherit; }
 .term-cell {
   background: var(--surface);
   padding: 8px;
-  min-height: 130px;
+  height: 160px;
   display: flex;
   flex-direction: column;
   gap: 4px;
   transition: background 0.15s;
   position: relative;
+  overflow: hidden;
 }
 
 .term-cell.drop-zone {
@@ -678,7 +679,11 @@ select, input { font-family: inherit; }
   display: flex;
   flex-direction: column;
   gap: 4px;
+  overflow-y: auto;
+  min-height: 0;
 }
+.term-courses::-webkit-scrollbar { width: 3px; }
+.term-courses::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
 
 /* Drop placeholder shown when dragging */
 .drop-placeholder {
@@ -712,6 +717,7 @@ select, input { font-family: inherit; }
   transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
   overflow: hidden;
   min-width: 0;
+  flex-shrink: 0;
 }
 
 .scheduled-course:hover {
@@ -901,14 +907,15 @@ select, input { font-family: inherit; }
 }
 
 .req-units-badge {
-  font-size: 10px;
-  color: var(--text-muted);
+  font-size: 11px;
+  color: var(--text);
   background: var(--bg);
   border: 1px solid var(--border);
   padding: 2px 7px;
   border-radius: 8px;
   white-space: nowrap;
   flex-shrink: 0;
+  font-weight: 600;
 }
 
 .req-desc {
@@ -919,12 +926,12 @@ select, input { font-family: inherit; }
 }
 
 .req-bar-wrap {
-  height: 7px;
+  height: 10px;
   background: var(--bg);
-  border-radius: 4px;
+  border-radius: 5px;
   overflow: hidden;
   position: relative;
-  margin-bottom: 6px;
+  margin-bottom: 2px;
   border: 1px solid var(--border-light);
 }
 
@@ -949,6 +956,15 @@ select, input { font-family: inherit; }
 
 .req-bar-fill.complete {
   background: linear-gradient(90deg, #16a34a, var(--green));
+}
+
+.req-bar-units-text {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  margin-top: 2px;
 }
 
 .req-subgroups {
