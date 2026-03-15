@@ -25,6 +25,7 @@ const DEPT_COLORS: Record<string, string> = {
   PS: '#1d4ed8', Psy: '#0e7490', SS: '#4338ca', SEC: '#475569',
   PE: '#15803d', APh: '#1e40af', ESE: '#047857', ChE: '#b91c1c',
   MS: '#6b7280', CNS: '#8b5cf6', IDS: '#0369a1', Custom: '#64748b',
+  Ae: '#0369a1', CDS: '#ea580c', NB: '#db2777',
 };
 
 export default function CourseSearch({
