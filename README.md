@@ -1,73 +1,37 @@
-# React + TypeScript + Vite
+# Caltech Course Planner
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A 4-year academic schedule planner for Caltech undergraduates. Plan your courses across all four years, track degree requirements, and avoid time conflicts.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **4-year schedule grid** — drag and drop courses into any year (Freshman–Senior) and term (Fall/Winter/Spring)
+- **Course catalog** — search and filter 200+ courses across all Caltech departments, with meeting times and unit counts
+- **Core requirements tracking** — progress bars for Caltech's 486-unit core graduation requirements
+- **Major & minor requirements** — checklist view for 15+ majors and 8+ minors; hover a requirement to highlight matching courses on the grid
+- **Time conflict detection** — courses with overlapping meeting times are flagged automatically
+- **Custom courses** — create custom course entries for research, off-campus credits, or courses not in the catalog
+- **Unit progress bar** — tracks total scheduled units toward the 486-unit graduation requirement
 
-## React Compiler
+## Course Data
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Course catalog is sourced from the [Caltech Registrar schedules](https://registrar.caltech.edu/schedules) (FA/WI/SP, 2021–22 through 2025–26) and the [Caltech Undergraduate Catalog](https://catalog.caltech.edu/current/information-for-undergraduate-students/). Meeting times reflect the most recent academic year available.
 
-## Expanding the ESLint configuration
+## Stack
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- React 19 + TypeScript
+- Vite 7
+- No external UI libraries — plain CSS
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Getting Started
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+nvm use 22
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+App runs at `http://localhost:5173`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run build   # production build → dist/
 ```
