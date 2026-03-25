@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import type { Course, Term } from '../types';
-import { COURSES, DEPARTMENTS } from '../data/courses';
+import { DEPARTMENTS } from '../data/courses';
 import type { DragPayload } from '../App';
 
 interface Props {
@@ -8,9 +8,10 @@ interface Props {
   scheduledCourseIds: Set<string>;
   onDragStart: (payload: DragPayload) => void;
   onDragEnd: () => void;
-  customCourses: Course[];
+  allCourses: Course[];
   onOpenCustomModal: () => void;
   onRemoveCustomCourse: (id: string) => void;
+  coursesLoading?: boolean;
 }
 
 const YEARS = ['Freshman', 'Sophomore', 'Junior', 'Senior'] as const;
@@ -30,7 +31,7 @@ const DEPT_COLORS: Record<string, string> = {
 
 export default function CourseSearch({
   onAddCourse, scheduledCourseIds, onDragStart, onDragEnd,
-  customCourses, onOpenCustomModal, onRemoveCustomCourse,
+  allCourses, onOpenCustomModal, onRemoveCustomCourse, coursesLoading,
 }: Props) {
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
@@ -38,8 +39,6 @@ export default function CourseSearch({
     year: 'Freshman',
     term: 'FA',
   });
-
-  const allCourses = useMemo(() => [...COURSES, ...customCourses], [customCourses]);
 
   const filtered = useMemo(() => {
     if (!search && !deptFilter) return [];
@@ -61,8 +60,8 @@ export default function CourseSearch({
   }, [search, deptFilter, allCourses]);
 
   const depts = useMemo(
-    () => [...new Set(COURSES.map(c => c.department))].sort(),
-    []
+    () => [...new Set(allCourses.filter(c => !c.isCustom).map(c => c.department))].sort(),
+    [allCourses]
   );
 
   return (
@@ -70,7 +69,11 @@ export default function CourseSearch({
       <div className="search-header">
         <h2 className="search-title">Course Catalog</h2>
         <span className="search-count">
-          {search || deptFilter ? `${filtered.length} found` : `${allCourses.length} total`}
+          {coursesLoading
+            ? 'Loading…'
+            : search || deptFilter
+              ? `${filtered.length} found`
+              : `${allCourses.length} total`}
         </span>
       </div>
 
@@ -127,17 +130,15 @@ export default function CourseSearch({
       </button>
 
       <div className="course-list">
-        {!search && !deptFilter && (
+        {coursesLoading && (
+          <div className="no-results"><p>Loading course catalog…</p></div>
+        )}
+        {!coursesLoading && !search && !deptFilter && (
           <div className="no-results">
             <p>Search or filter by department to browse courses</p>
-            {customCourses.length > 0 && (
-              <p style={{ marginTop: 8, fontSize: 11, color: '#64748b' }}>
-                {customCourses.length} custom course{customCourses.length !== 1 ? 's' : ''} — search to see them
-              </p>
-            )}
           </div>
         )}
-        {(search || deptFilter) && filtered.length === 0 && (
+        {!coursesLoading && (search || deptFilter) && filtered.length === 0 && (
           <div className="no-results">
             <p>No courses found</p>
           </div>
@@ -145,9 +146,6 @@ export default function CourseSearch({
         {filtered.map(course => {
           const scheduled = scheduledCourseIds.has(course.id);
           const deptColor = DEPT_COLORS[course.department] ?? '#64748b';
-          const timeStr = course.meetingTime
-            ? `${course.meetingTime.days} ${course.meetingTime.start}–${course.meetingTime.end}`
-            : null;
           return (
             <div
               key={course.id}
@@ -177,10 +175,7 @@ export default function CourseSearch({
                 </div>
                 <div className="course-card-name" title={course.name}>{course.name}</div>
                 <div className="course-card-footer">
-                  <div className="course-card-meta">
-                    <span className="course-terms-small">{course.terms.join(' · ')}</span>
-                    {timeStr && <span className="course-time-small">{timeStr}</span>}
-                  </div>
+                  <span className="course-terms-small">{course.terms.join(' · ')}</span>
                   <button
                     className={`add-btn ${scheduled ? 'added' : ''}`}
                     title={`Add to ${addTarget.year} ${TERM_LABELS[addTarget.term]}`}

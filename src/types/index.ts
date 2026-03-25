@@ -1,12 +1,6 @@
 export type Term = 'FA' | 'WI' | 'SP';
 export type Year = 'Freshman' | 'Sophomore' | 'Junior' | 'Senior';
 
-export interface MeetingTime {
-  days: string;   // e.g. "MWF" or "TTh"
-  start: string;  // e.g. "10:00"
-  end: string;    // e.g. "10:55"
-}
-
 export interface Course {
   id: string;
   number: string;
@@ -16,7 +10,6 @@ export interface Course {
   department: string;
   description?: string;
   prerequisites?: string[];
-  meetingTime?: MeetingTime;
   isCustom?: boolean;
 }
 

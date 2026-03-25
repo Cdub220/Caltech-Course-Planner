@@ -1,10 +1,24 @@
 /**
- * Database helpers for schedule persistence.
+ * Database helpers for schedule persistence and course catalog.
  * All queries run through Supabase RLS — the server enforces
  * that each user can only read/write their own rows.
+ * The courses table is publicly readable (no auth required).
  */
 import { supabase } from './supabase';
 import type { Schedule, Course } from '../types';
+
+/** Fetch the full course catalog from Supabase (populated by sync job). */
+export async function fetchCourses(): Promise<Course[]> {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('id, number, name, units, terms, department')
+    .order('number');
+  if (error) {
+    console.error('fetchCourses error:', error.message);
+    return [];
+  }
+  return (data ?? []) as Course[];
+}
 
 export type SaveResult = { ok: true; id: string } | { ok: false; error: string };
 

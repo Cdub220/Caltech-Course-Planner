@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import type { Course, Schedule, Term } from './types';
 import { MAJORS, MINORS } from './data/majorRequirements';
 import { useAuth } from './hooks/useAuth';
-import { saveSchedule, loadSchedule } from './lib/db';
+import { saveSchedule, loadSchedule, fetchCourses } from './lib/db';
 import CourseSearch from './components/CourseSearch';
 import ScheduleGrid from './components/ScheduleGrid';
 import CoreRequirementsPanel from './components/CoreRequirementsPanel';
@@ -29,6 +29,8 @@ function emptySchedule(): Schedule {
 export default function App() {
   const auth = useAuth();
 
+  const [catalogCourses, setCatalogCourses] = useState<Course[]>([]);
+  const [coursesLoading, setCoursesLoading] = useState(true);
   const [schedule, setSchedule] = useState<Schedule>(emptySchedule());
   const [customCourses, setCustomCourses] = useState<Course[]>([]);
   const [selectedMajorId, setSelectedMajorId] = useState('');
@@ -42,6 +44,19 @@ export default function App() {
   const [dragPayload, setDragPayload] = useState<DragPayload | null>(null);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [scheduleId, setScheduleId] = useState<string | undefined>();
+
+  // ── Fetch course catalog from Supabase once on mount ─────────────
+  useEffect(() => {
+    fetchCourses().then(courses => {
+      setCatalogCourses(courses);
+      setCoursesLoading(false);
+    });
+  }, []);
+
+  const allCourses = useMemo(
+    () => [...catalogCourses, ...customCourses],
+    [catalogCourses, customCourses]
+  );
 
   // ── Load schedule when user logs in ──────────────────────────────
   useEffect(() => {
@@ -247,7 +262,8 @@ export default function App() {
           scheduledCourseIds={scheduledCourseIds}
           onDragStart={setDragPayload}
           onDragEnd={() => setDragPayload(null)}
-          customCourses={customCourses}
+          allCourses={allCourses}
+          coursesLoading={coursesLoading}
           onOpenCustomModal={() => setShowCustomModal(true)}
           onRemoveCustomCourse={handleRemoveCustomCourse}
         />
@@ -260,23 +276,23 @@ export default function App() {
             dragPayload={dragPayload}
             onDragStart={setDragPayload}
             onDragEnd={() => setDragPayload(null)}
-            customCourses={customCourses}
+            allCourses={allCourses}
           />
         </main>
       </div>
 
       {/* ── OVERLAYS ──────────────────────────────────────── */}
-      {showCore && <CoreRequirementsPanel schedule={schedule} onClose={() => setShowCore(false)} />}
+      {showCore && <CoreRequirementsPanel schedule={schedule} allCourses={allCourses} onClose={() => setShowCore(false)} />}
       {showMajor && selectedMajor && (
         <MajorRequirementsPanel
-          major={selectedMajor} schedule={schedule}
+          major={selectedMajor} schedule={schedule} allCourses={allCourses}
           onClose={() => { setShowMajor(false); setHighlightedCourses(new Set()); }}
           onHighlightCourses={setHighlightedCourses}
         />
       )}
       {showMinor && selectedMinor && (
         <MajorRequirementsPanel
-          major={selectedMinor} schedule={schedule}
+          major={selectedMinor} schedule={schedule} allCourses={allCourses}
           onClose={() => { setShowMinor(false); setHighlightedCourses(new Set()); }}
           onHighlightCourses={setHighlightedCourses}
         />

@@ -1,9 +1,9 @@
-import type { Major, Schedule, Requirement } from '../types';
-import { getCourseById } from '../data/courses';
+import type { Major, Schedule, Requirement, Course } from '../types';
 
 interface Props {
   major: Major;
   schedule: Schedule;
+  allCourses: Course[];
   onClose: () => void;
   onHighlightCourses: (ids: Set<string>) => void;
 }
@@ -25,10 +25,10 @@ interface ReqResult {
   matchedCourses: string[];
 }
 
-function checkRequirement(req: Requirement, scheduledIds: string[]): ReqResult {
+function checkRequirement(req: Requirement, scheduledIds: string[], allCourses: Course[]): ReqResult {
   const matchedCourses = (req.courses ?? []).filter(id => scheduledIds.includes(id));
   const earnedUnits = matchedCourses.reduce((sum, id) => {
-    const c = getCourseById(id);
+    const c = allCourses.find(x => x.id === id);
     return sum + (c?.units ?? 0);
   }, 0);
 
@@ -55,12 +55,12 @@ function Bar({ pct, done }: BarProps) {
   );
 }
 
-export default function MajorRequirementsPanel({ major, schedule, onClose, onHighlightCourses }: Props) {
+export default function MajorRequirementsPanel({ major, schedule, allCourses, onClose, onHighlightCourses }: Props) {
   const scheduledIds = getAllScheduledIds(schedule);
 
   const results = major.requirements.map(req => ({
     req,
-    result: checkRequirement(req, scheduledIds),
+    result: checkRequirement(req, scheduledIds, allCourses),
   }));
 
   const completedCount = results.filter(r => r.result.satisfied).length;
@@ -117,7 +117,7 @@ export default function MajorRequirementsPanel({ major, schedule, onClose, onHig
               {result.matchedCourses.length > 0 && (
                 <div className="req-matched">
                   {result.matchedCourses.map(id => {
-                    const c = getCourseById(id);
+                    const c = allCourses.find(x => x.id === id);
                     return c ? (
                       <span key={id} className="req-matched-course">
                         {c.number}
@@ -135,7 +135,7 @@ export default function MajorRequirementsPanel({ major, schedule, onClose, onHig
                     .filter(id => !scheduledIds.includes(id))
                     .slice(0, 5)
                     .map(id => {
-                      const c = getCourseById(id);
+                      const c = allCourses.find(x => x.id === id);
                       return c ? (
                         <span key={id} className="req-suggestion">{c.number}</span>
                       ) : null;
