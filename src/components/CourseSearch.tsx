@@ -14,10 +14,6 @@ interface Props {
   coursesLoading?: boolean;
 }
 
-const YEARS = ['Freshman', 'Sophomore', 'Junior', 'Senior'] as const;
-const TERMS: Term[] = ['FA', 'WI', 'SP'];
-const TERM_LABELS: Record<Term, string> = { FA: 'Fall', WI: 'Winter', SP: 'Spring' };
-
 const DEPT_COLORS: Record<string, string> = {
   Ma: '#7b5ea7', Ph: '#2563eb', Ch: '#059669', CS: '#d97706',
   EE: '#dc2626', ME: '#0891b2', Bi: '#16a34a', BE: '#65a30d',
@@ -32,16 +28,12 @@ const DEPT_COLORS: Record<string, string> = {
 const PAGE_SIZE = 5;
 
 export default function CourseSearch({
-  onAddCourse, scheduledCourseIds, onDragStart, onDragEnd,
+  onAddCourse: _onAddCourse, scheduledCourseIds, onDragStart, onDragEnd,
   allCourses, onOpenCustomModal, onRemoveCustomCourse, coursesLoading,
 }: Props) {
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
   const [page, setPage] = useState(0);
-  const [addTarget, setAddTarget] = useState<{ year: string; term: Term }>({
-    year: 'Freshman',
-    term: 'FA',
-  });
 
   const filtered = useMemo(() => {
     if (!search && !deptFilter) return [];
@@ -112,24 +104,6 @@ export default function CourseSearch({
         </select>
       </div>
 
-      <div className="add-target-bar">
-        <span className="add-target-label">Quick add →</span>
-        <select
-          value={addTarget.year}
-          onChange={e => setAddTarget(t => ({ ...t, year: e.target.value }))}
-          className="add-target-select"
-        >
-          {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-        </select>
-        <select
-          value={addTarget.term}
-          onChange={e => setAddTarget(t => ({ ...t, term: e.target.value as Term }))}
-          className="add-target-select"
-        >
-          {TERMS.map(t => <option key={t} value={t}>{TERM_LABELS[t]}</option>)}
-        </select>
-      </div>
-
       <div className="drag-hint">
         <span>Drag cards onto the schedule</span>
       </div>
@@ -185,13 +159,7 @@ export default function CourseSearch({
                 <div className="course-card-name" title={course.name}>{course.name}</div>
                 <div className="course-card-footer">
                   <span className="course-terms-small">{course.terms.join(' · ')}</span>
-                  <button
-                    className={`add-btn ${scheduled ? 'added' : ''}`}
-                    title={`Add to ${addTarget.year} ${TERM_LABELS[addTarget.term]}`}
-                    onClick={() => onAddCourse(course, addTarget.year, addTarget.term)}
-                  >
-                    {scheduled ? '✓' : '+'}
-                  </button>
+                  {scheduled && <span className="scheduled-badge">✓ Scheduled</span>}
                 </div>
               </div>
             </div>

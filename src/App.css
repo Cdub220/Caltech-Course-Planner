@@ -483,8 +483,12 @@ select, input { font-family: inherit; }
   transition: background 0.15s, transform 0.1s;
 }
 
-.add-btn:hover { background: var(--orange-dark); transform: scale(1.15); }
-.add-btn.added { background: var(--green); font-size: 11px; }
+.scheduled-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--green);
+  white-space: nowrap;
+}
 
 /* ══════════════════════════════════════════════════════════════
    SCHEDULE MAIN
