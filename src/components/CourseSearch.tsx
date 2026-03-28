@@ -29,12 +29,15 @@ const DEPT_COLORS: Record<string, string> = {
   Ae: '#0369a1', CDS: '#ea580c', NB: '#db2777',
 };
 
+const PAGE_SIZE = 5;
+
 export default function CourseSearch({
   onAddCourse, scheduledCourseIds, onDragStart, onDragEnd,
   allCourses, onOpenCustomModal, onRemoveCustomCourse, coursesLoading,
 }: Props) {
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
+  const [page, setPage] = useState(0);
   const [addTarget, setAddTarget] = useState<{ year: string; term: Term }>({
     year: 'Freshman',
     term: 'FA',
@@ -58,6 +61,12 @@ export default function CourseSearch({
       return matchesSearch && matchesDept;
     });
   }, [search, deptFilter, allCourses]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const pageCourses = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  const handleSearchChange = (val: string) => { setSearch(val); setPage(0); };
+  const handleDeptChange = (val: string) => { setDeptFilter(val); setPage(0); };
 
   const depts = useMemo(
     () => [...new Set(allCourses.filter(c => !c.isCustom).map(c => c.department))].sort(),
@@ -85,16 +94,16 @@ export default function CourseSearch({
             type="text"
             placeholder="Search courses..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => handleSearchChange(e.target.value)}
           />
           {search && (
-            <button className="search-clear" onClick={() => setSearch('')}>×</button>
+            <button className="search-clear" onClick={() => handleSearchChange('')}>×</button>
           )}
         </div>
         <select
           className="dept-select"
           value={deptFilter}
-          onChange={e => setDeptFilter(e.target.value)}
+          onChange={e => handleDeptChange(e.target.value)}
         >
           <option value="">All Departments</option>
           {depts.map(d => (
@@ -143,7 +152,7 @@ export default function CourseSearch({
             <p>No courses found</p>
           </div>
         )}
-        {filtered.map(course => {
+        {pageCourses.map(course => {
           const scheduled = scheduledCourseIds.has(course.id);
           const deptColor = DEPT_COLORS[course.department] ?? '#64748b';
           return (
@@ -189,6 +198,22 @@ export default function CourseSearch({
           );
         })}
       </div>
+
+      {totalPages > 1 && (
+        <div className="pagination-bar">
+          <button
+            className="page-btn"
+            onClick={() => setPage(p => Math.max(0, p - 1))}
+            disabled={page === 0}
+          >‹</button>
+          <span className="page-info">{page + 1} / {totalPages}</span>
+          <button
+            className="page-btn"
+            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+            disabled={page === totalPages - 1}
+          >›</button>
+        </div>
+      )}
     </aside>
   );
 }

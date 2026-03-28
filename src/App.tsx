@@ -242,8 +242,7 @@ export default function App() {
             <div className="topbar-user-area">
               <SaveStatus state={saveState} onSave={handleManualSave} />
               <div className="user-pill">
-                <span className="user-avatar">{auth.user?.email?.[0].toUpperCase()}</span>
-                <span className="user-email">{auth.user?.email}</span>
+                <span className="user-avatar" title={auth.user?.email}>{auth.user?.email?.[0].toUpperCase()}</span>
                 <button className="signout-btn" onClick={auth.signOut} title="Sign out">Sign out</button>
               </div>
             </div>
