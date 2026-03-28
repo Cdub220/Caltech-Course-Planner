@@ -87,7 +87,7 @@ function TermCell({
         draggable
         onDragStart={e => {
           e.stopPropagation();
-          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.effectAllowed = 'copy';
           const payload: DragPayload = { courseId: id, fromYear: year, fromTerm: term };
           e.dataTransfer.setData('text/plain', JSON.stringify(payload));
           onDragStart(payload);
