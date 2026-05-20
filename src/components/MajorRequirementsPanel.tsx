@@ -1,21 +1,13 @@
-import type { Major, Schedule, Requirement, Course } from '../types';
+import type { Major, Schedule, Requirement, Course, UnitOverrides } from '../types';
+import { scheduledInstances, totalEffectiveUnitsForCourse } from '../lib/units';
 
 interface Props {
   major: Major;
   schedule: Schedule;
   allCourses: Course[];
+  unitOverrides: UnitOverrides;
   onClose: () => void;
   onHighlightCourses: (ids: Set<string>) => void;
-}
-
-function getAllScheduledIds(schedule: Schedule): string[] {
-  const ids: string[] = [];
-  for (const terms of Object.values(schedule)) {
-    for (const courseIds of Object.values(terms)) {
-      ids.push(...courseIds);
-    }
-  }
-  return ids;
 }
 
 interface ReqResult {
@@ -25,12 +17,18 @@ interface ReqResult {
   matchedCourses: string[];
 }
 
-function checkRequirement(req: Requirement, scheduledIds: string[], allCourses: Course[]): ReqResult {
-  const matchedCourses = (req.courses ?? []).filter(id => scheduledIds.includes(id));
-  const earnedUnits = matchedCourses.reduce((sum, id) => {
-    const c = allCourses.find(x => x.id === id);
-    return sum + (c?.units ?? 0);
-  }, 0);
+function checkRequirement(
+  req: Requirement,
+  scheduledIds: Set<string>,
+  schedule: Schedule,
+  allCourses: Course[],
+  overrides: UnitOverrides,
+): ReqResult {
+  const matchedCourses = (req.courses ?? []).filter(id => scheduledIds.has(id));
+  const earnedUnits = matchedCourses.reduce(
+    (sum, id) => sum + totalEffectiveUnitsForCourse(id, schedule, allCourses, overrides),
+    0,
+  );
 
   const requiredUnits = req.minUnits ?? (req.minCourses ?? 1) * 9;
   const enoughUnits = earnedUnits >= (req.minUnits ?? 0);
@@ -55,19 +53,19 @@ function Bar({ pct, done }: BarProps) {
   );
 }
 
-export default function MajorRequirementsPanel({ major, schedule, allCourses, onClose, onHighlightCourses }: Props) {
-  const scheduledIds = getAllScheduledIds(schedule);
+export default function MajorRequirementsPanel({ major, schedule, allCourses, unitOverrides, onClose, onHighlightCourses }: Props) {
+  const scheduledIds = new Set(scheduledInstances(schedule).map(i => i.courseId));
 
   const results = major.requirements.map(req => ({
     req,
-    result: checkRequirement(req, scheduledIds, allCourses),
+    result: checkRequirement(req, scheduledIds, schedule, allCourses, unitOverrides),
   }));
 
   const completedCount = results.filter(r => r.result.satisfied).length;
   const totalCount = results.length;
 
   const handleHighlight = (courseIds: string[]) => {
-    onHighlightCourses(new Set(courseIds.filter(id => scheduledIds.includes(id))));
+    onHighlightCourses(new Set(courseIds.filter(id => scheduledIds.has(id))));
   };
 
   const clearHighlight = () => onHighlightCourses(new Set());
@@ -132,7 +130,7 @@ export default function MajorRequirementsPanel({ major, schedule, allCourses, on
                 <div className="req-needed">
                   <span className="req-needed-label">Could satisfy with: </span>
                   {(req.courses ?? [])
-                    .filter(id => !scheduledIds.includes(id))
+                    .filter(id => !scheduledIds.has(id))
                     .slice(0, 5)
                     .map(id => {
                       const c = allCourses.find(x => x.id === id);

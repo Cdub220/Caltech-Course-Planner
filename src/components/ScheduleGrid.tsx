@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Term, Schedule, Course, UnitOverrides } from '../types';
 import type { DragPayload } from '../App';
+import { getEffectiveUnits } from '../lib/units';
 
 interface Props {
   schedule: Schedule;
@@ -13,22 +14,6 @@ interface Props {
   onDragStart: (payload: DragPayload) => void;
   onDragEnd: () => void;
   allCourses: Course[];
-}
-
-// Default units shown for variable-unit (research/thesis) courses
-// when the user hasn't set their own value yet.
-const DEFAULT_VARIABLE_UNITS = 9;
-
-function effectiveUnits(
-  course: Course,
-  year: string,
-  term: Term,
-  overrides: UnitOverrides,
-): number {
-  const override = overrides[year]?.[term]?.[course.id];
-  if (override !== undefined) return override;
-  if (course.units === 0) return DEFAULT_VARIABLE_UNITS;
-  return course.units;
 }
 
 const YEARS = ['Freshman', 'Sophomore', 'Junior', 'Senior'] as const;
@@ -49,7 +34,7 @@ function termUnits(
 ): number {
   return courseIds.reduce((sum, id) => {
     const c = allCourses.find(x => x.id === id);
-    return sum + (c ? effectiveUnits(c, year, term, overrides) : 0);
+    return sum + (c ? getEffectiveUnits(c, year, term, overrides) : 0);
   }, 0);
 }
 
@@ -108,7 +93,7 @@ function TermCell({
     const highlighted = highlightedCourses?.has(id);
     const deptColor = DEPT_COLORS[course.department] ?? '#64748b';
     const isVariable = course.units === 0;
-    const shownUnits = effectiveUnits(course, year, term, unitOverrides);
+    const shownUnits = getEffectiveUnits(course, year, term, unitOverrides);
     const isEditing = editingUnitsFor === id;
     return (
       <div

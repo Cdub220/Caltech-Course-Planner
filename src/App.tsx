@@ -13,6 +13,7 @@ import SaveStatus, { type SaveState } from './components/SaveStatus';
 import './App.css';
 
 const YEARS = ['Freshman', 'Sophomore', 'Junior', 'Senior'];
+const ANON_KEY = 'caltech-anon-state';
 
 export interface DragPayload {
   courseId: string;
@@ -62,30 +63,89 @@ export default function App() {
   // ── Load schedule when user logs in ──────────────────────────────
   useEffect(() => {
     if (auth.status !== 'authed' || !auth.user) return;
+    // Snapshot the current (likely anon) state so we can push it to the server
+    // if there's no server schedule yet — without this, the user loses their
+    // pre-signup work on the next refresh.
+    const localSchedule = schedule;
+    const localCustom = customCourses;
+    const localOverrides = unitOverrides;
+    const localMajor = selectedMajorId;
+    const localMinor = selectedMinorId;
     loadSchedule(auth.user.id).then(result => {
-      if (!result.ok || !result.data) return;
-      const { schedule, customCourses: cc, unitOverrides: uo, major_id, minor_id, id } = result.data;
-      setSchedule(schedule);
-      setCustomCourses(cc);
-      setUnitOverrides(uo);
-      setSelectedMajorId(major_id ?? '');
-      setSelectedMinorId(minor_id ?? '');
-      setScheduleId(id);
+      if (!result.ok) return;
+      if (result.data) {
+        const { schedule: s, customCourses: cc, unitOverrides: uo, major_id, minor_id, id } = result.data;
+        setSchedule(s);
+        setCustomCourses(cc);
+        setUnitOverrides(uo);
+        setSelectedMajorId(major_id ?? '');
+        setSelectedMinorId(minor_id ?? '');
+        setScheduleId(id);
+        return;
+      }
+      // No server schedule yet — promote the local anon state up if non-empty.
+      const hasLocalWork =
+        Object.values(localSchedule).some(t => Object.values(t).some(ids => ids.length > 0)) ||
+        localCustom.length > 0 || !!localMajor || !!localMinor;
+      if (hasLocalWork && auth.user) {
+        saveSchedule(auth.user.id, localSchedule, localCustom, localOverrides, localMajor, localMinor, undefined)
+          .then(r => { if (r.ok) setScheduleId(r.id); });
+      }
     });
-  }, [auth.status, auth.user]);
+  }, [auth.status, auth.user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reset when user logs out
+  // ── Anonymous user persistence (localStorage) ──────────────────
+  // Anonymous users keep their work-in-progress in localStorage so a refresh
+  // doesn't wipe it. When the user signs in, server state takes over; on
+  // signout, the anon snapshot is wiped so the next visitor starts clean.
+  const prevAuthStatus = useRef(auth.status);
   useEffect(() => {
-    if (auth.status === 'anon') {
-      setSchedule(emptySchedule());
-      setCustomCourses([]);
-      setUnitOverrides({});
-      setSelectedMajorId('');
-      setSelectedMinorId('');
+    // Sign-out transition (authed → anon): clear the local anon snapshot.
+    if (prevAuthStatus.current === 'authed' && auth.status === 'anon') {
+      try { localStorage.removeItem(ANON_KEY); } catch { /* ignore quota / private mode */ }
+    }
+    prevAuthStatus.current = auth.status;
+  }, [auth.status]);
+
+  // Hydrate anon state from localStorage (or reset to empty if none).
+  useEffect(() => {
+    if (auth.status !== 'anon') return;
+    try {
+      const raw = localStorage.getItem(ANON_KEY);
+      if (raw) {
+        const d = JSON.parse(raw) as {
+          schedule?: Schedule; customCourses?: Course[]; unitOverrides?: UnitOverrides;
+          selectedMajorId?: string; selectedMinorId?: string;
+        };
+        setSchedule(d.schedule ?? emptySchedule());
+        setCustomCourses(d.customCourses ?? []);
+        setUnitOverrides(d.unitOverrides ?? {});
+        setSelectedMajorId(d.selectedMajorId ?? '');
+        setSelectedMinorId(d.selectedMinorId ?? '');
+      } else {
+        setSchedule(emptySchedule());
+        setCustomCourses([]);
+        setUnitOverrides({});
+        setSelectedMajorId('');
+        setSelectedMinorId('');
+      }
       setScheduleId(undefined);
       setSaveState('idle');
+    } catch {
+      try { localStorage.removeItem(ANON_KEY); } catch { /* ignore */ }
     }
   }, [auth.status]);
+
+  // Persist anon state on every change.
+  useEffect(() => {
+    if (auth.status !== 'anon') return;
+    try {
+      localStorage.setItem(
+        ANON_KEY,
+        JSON.stringify({ schedule, customCourses, unitOverrides, selectedMajorId, selectedMinorId }),
+      );
+    } catch { /* quota / private mode — silently skip */ }
+  }, [auth.status, schedule, customCourses, unitOverrides, selectedMajorId, selectedMinorId]);
 
   // ── Auto-save (debounced 2s after any change) ─────────────────────
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -319,17 +379,17 @@ export default function App() {
       </div>
 
       {/* ── OVERLAYS ──────────────────────────────────────── */}
-      {showCore && <CoreRequirementsPanel schedule={schedule} allCourses={allCourses} onClose={() => setShowCore(false)} />}
+      {showCore && <CoreRequirementsPanel schedule={schedule} allCourses={allCourses} unitOverrides={unitOverrides} onClose={() => setShowCore(false)} />}
       {showMajor && selectedMajor && (
         <MajorRequirementsPanel
-          major={selectedMajor} schedule={schedule} allCourses={allCourses}
+          major={selectedMajor} schedule={schedule} allCourses={allCourses} unitOverrides={unitOverrides}
           onClose={() => { setShowMajor(false); setHighlightedCourses(new Set()); }}
           onHighlightCourses={setHighlightedCourses}
         />
       )}
       {showMinor && selectedMinor && (
         <MajorRequirementsPanel
-          major={selectedMinor} schedule={schedule} allCourses={allCourses}
+          major={selectedMinor} schedule={schedule} allCourses={allCourses} unitOverrides={unitOverrides}
           onClose={() => { setShowMinor(false); setHighlightedCourses(new Set()); }}
           onHighlightCourses={setHighlightedCourses}
         />

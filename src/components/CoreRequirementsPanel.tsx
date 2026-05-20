@@ -1,47 +1,45 @@
-import type { CoreRequirementGroup, Schedule, Course } from '../types';
+import type { CoreRequirementGroup, Schedule, Course, UnitOverrides } from '../types';
 import { CORE_REQUIREMENTS, TOTAL_UNITS_REQUIRED } from '../data/coreRequirements';
+import { scheduledInstances, getEffectiveUnits, totalEffectiveUnitsForCourse } from '../lib/units';
 
 interface Props {
   schedule: Schedule;
   allCourses: Course[];
+  unitOverrides: UnitOverrides;
   onClose: () => void;
 }
 
-function getAllScheduledIds(schedule: Schedule): string[] {
-  const ids: string[] = [];
-  for (const terms of Object.values(schedule)) {
-    for (const courseIds of Object.values(terms)) {
-      ids.push(...courseIds);
-    }
-  }
-  return ids;
-}
-
-function getTotalUnits(schedule: Schedule, allCourses: Course[]): number {
-  return getAllScheduledIds(schedule).reduce((sum, id) => {
-    const c = allCourses.find(x => x.id === id);
-    return sum + (c?.units ?? 0);
+function getTotalUnits(schedule: Schedule, allCourses: Course[], overrides: UnitOverrides): number {
+  return scheduledInstances(schedule).reduce((sum, inst) => {
+    const c = allCourses.find(x => x.id === inst.courseId);
+    return sum + (c ? getEffectiveUnits(c, inst.year, inst.term, overrides) : 0);
   }, 0);
 }
 
-function checkGroup(group: CoreRequirementGroup, scheduledIds: string[], allCourses: Course[]): {
+function checkGroup(
+  group: CoreRequirementGroup,
+  scheduledIds: Set<string>,
+  schedule: Schedule,
+  allCourses: Course[],
+  overrides: UnitOverrides,
+): {
   earned: number;
   required: number;
   pct: number;
   subResults?: ReturnType<typeof checkGroup>[];
 } {
   if (group.subGroups) {
-    const subResults = group.subGroups.map(sg => checkGroup(sg, scheduledIds, allCourses));
+    const subResults = group.subGroups.map(sg => checkGroup(sg, scheduledIds, schedule, allCourses, overrides));
     const earned = subResults.reduce((s, r) => s + r.earned, 0);
     const required = group.minUnits ?? subResults.reduce((s, r) => s + r.required, 0);
     return { earned, required, pct: Math.min(earned / required, 1), subResults };
   }
 
-  const matchingIds = (group.courses ?? []).filter(id => scheduledIds.includes(id));
-  const earned = matchingIds.reduce((sum, id) => {
-    const c = allCourses.find(x => x.id === id);
-    return sum + (c?.units ?? 0);
-  }, 0);
+  const matchingIds = (group.courses ?? []).filter(id => scheduledIds.has(id));
+  const earned = matchingIds.reduce(
+    (sum, id) => sum + totalEffectiveUnitsForCourse(id, schedule, allCourses, overrides),
+    0,
+  );
   const required = group.minUnits ?? 9;
   return { earned, required, pct: Math.min(earned / required, 1) };
 }
@@ -68,9 +66,9 @@ function ProgressBar({ pct, earned, required }: BarProps) {
   );
 }
 
-export default function CoreRequirementsPanel({ schedule, allCourses, onClose }: Props) {
-  const scheduledIds = getAllScheduledIds(schedule);
-  const totalUnits = getTotalUnits(schedule, allCourses);
+export default function CoreRequirementsPanel({ schedule, allCourses, unitOverrides, onClose }: Props) {
+  const scheduledIds = new Set(scheduledInstances(schedule).map(i => i.courseId));
+  const totalUnits = getTotalUnits(schedule, allCourses, unitOverrides);
   const totalPct = totalUnits / TOTAL_UNITS_REQUIRED;
 
   return (
@@ -91,7 +89,7 @@ export default function CoreRequirementsPanel({ schedule, allCourses, onClose }:
           </div>
 
           {CORE_REQUIREMENTS.map(group => {
-            const result = checkGroup(group, scheduledIds, allCourses);
+            const result = checkGroup(group, scheduledIds, schedule, allCourses, unitOverrides);
             return (
               <div key={group.id} className="req-group">
                 <div className="req-name">{group.name}</div>
