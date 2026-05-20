@@ -73,8 +73,10 @@ Deno.serve(async () => {
         synced_at: new Date().toISOString(),
       };
     })
-    // Skip courses with zero units or empty terms (usually admin/placeholder entries)
-    .filter(c => c.units > 0 && c.terms.length > 0);
+    // Skip only entries with no terms — these are truly empty placeholders.
+    // Keep 0-unit courses: research, thesis, and independent study are variable-unit
+    // and the user sets their own units per slot in the UI.
+    .filter(c => c.terms.length > 0);
 
   // Upsert all courses (insert or update on id conflict)
   const { error } = await supabase

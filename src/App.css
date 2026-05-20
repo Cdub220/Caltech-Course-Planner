@@ -383,6 +383,7 @@ select, input { font-family: inherit; }
 .course-card {
   display: flex;
   align-items: stretch;
+  flex-shrink: 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -768,6 +769,38 @@ select, input { font-family: inherit; }
   color: var(--text-faint);
   flex-shrink: 0;
   white-space: nowrap;
+}
+
+.sc-units-editable {
+  background: #f3f4f6;
+  border: 1px dashed #cbd5e1;
+  border-radius: 3px;
+  padding: 0 4px;
+  color: var(--text-2);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s, color 0.1s;
+}
+.sc-units-editable:hover {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+.sc-units-input {
+  width: 38px;
+  font-size: 10px;
+  padding: 0 4px;
+  border: 1px solid #f59e0b;
+  border-radius: 3px;
+  background: #fff;
+  font-family: inherit;
+  outline: none;
+}
+.sc-units-input::-webkit-inner-spin-button,
+.sc-units-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .remove-btn {

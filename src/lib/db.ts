@@ -5,7 +5,7 @@
  * The courses table is publicly readable (no auth required).
  */
 import { supabase } from './supabase';
-import type { Schedule, Course } from '../types';
+import type { Schedule, Course, UnitOverrides } from '../types';
 
 /** Fetch the full course catalog from Supabase (populated by sync job). */
 export async function fetchCourses(): Promise<Course[]> {
@@ -25,18 +25,23 @@ export type SaveResult = { ok: true; id: string } | { ok: false; error: string }
 export interface LoadedData {
   schedule: Schedule;
   customCourses: Course[];
+  unitOverrides: UnitOverrides;
   major_id: string;
   minor_id: string;
   id: string;
 }
 
-/** Parse schedule_data which may be legacy (Schedule only) or new ({ schedule, customCourses }). */
-function parseScheduleData(raw: unknown): { schedule: Schedule; customCourses: Course[] } {
+/** Parse schedule_data which may be legacy (Schedule only) or new ({ schedule, customCourses, unitOverrides }). */
+function parseScheduleData(raw: unknown): { schedule: Schedule; customCourses: Course[]; unitOverrides: UnitOverrides } {
   if (raw && typeof raw === 'object' && !Array.isArray(raw) && 'schedule' in raw) {
-    const typed = raw as { schedule: Schedule; customCourses?: Course[] };
-    return { schedule: typed.schedule, customCourses: typed.customCourses ?? [] };
+    const typed = raw as { schedule: Schedule; customCourses?: Course[]; unitOverrides?: UnitOverrides };
+    return {
+      schedule: typed.schedule,
+      customCourses: typed.customCourses ?? [],
+      unitOverrides: typed.unitOverrides ?? {},
+    };
   }
-  return { schedule: raw as Schedule, customCourses: [] };
+  return { schedule: raw as Schedule, customCourses: [], unitOverrides: {} };
 }
 
 /** Upsert the user's primary schedule (one per user for now). */
@@ -44,6 +49,7 @@ export async function saveSchedule(
   userId: string,
   schedule: Schedule,
   customCourses: Course[],
+  unitOverrides: UnitOverrides,
   majorId: string,
   minorId: string,
   existingId?: string,
@@ -51,7 +57,7 @@ export async function saveSchedule(
   const payload = {
     user_id: userId,
     name: 'My Schedule',
-    schedule_data: { schedule, customCourses },
+    schedule_data: { schedule, customCourses, unitOverrides },
     major_id: majorId,
     minor_id: minorId,
     updated_at: new Date().toISOString(),
@@ -93,9 +99,9 @@ export async function loadSchedule(userId: string): Promise<{ ok: true; data: Lo
   if (error) return { ok: false, error: error.message };
   if (!data) return { ok: true, data: null };
 
-  const { schedule, customCourses } = parseScheduleData(data.schedule_data);
+  const { schedule, customCourses, unitOverrides } = parseScheduleData(data.schedule_data);
   return {
     ok: true,
-    data: { schedule, customCourses, major_id: data.major_id, minor_id: data.minor_id, id: data.id },
+    data: { schedule, customCourses, unitOverrides, major_id: data.major_id, minor_id: data.minor_id, id: data.id },
   };
 }

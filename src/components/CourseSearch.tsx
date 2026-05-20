@@ -25,7 +25,15 @@ const DEPT_COLORS: Record<string, string> = {
   Ae: '#0369a1', CDS: '#ea580c', NB: '#db2777',
 };
 
-const PAGE_SIZE = 5;
+// Parse course number ("CS 1", "Ma 1a", "Ae/APh/CE/ME 101a") into a
+// numeric part + letter suffix so we can sort 1, 2, 11 in proper order
+// (not lexically as "1", "11", "2").
+function parseCourseNumber(number: string): { num: number; suffix: string } {
+  const lastPart = number.split(' ').pop() ?? '';
+  const match = lastPart.match(/^(\d+)([a-z]*)$/i);
+  if (!match) return { num: Number.MAX_SAFE_INTEGER, suffix: lastPart };
+  return { num: parseInt(match[1], 10), suffix: match[2].toLowerCase() };
+}
 
 export default function CourseSearch({
   onAddCourse: _onAddCourse, scheduledCourseIds, onDragStart, onDragEnd,
@@ -33,13 +41,13 @@ export default function CourseSearch({
 }: Props) {
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
-  const [page, setPage] = useState(0);
 
   const filtered = useMemo(() => {
     if (!search && !deptFilter) return [];
     const q = search.toLowerCase().trim();
     const qNoSpace = q.replace(/\s+/g, '');
-    return allCourses.filter(c => {
+
+    const matched = allCourses.filter(c => {
       const numLower = c.number.toLowerCase();
       const numNoSpace = numLower.replace(/\s+/g, '');
       const matchesSearch =
@@ -52,13 +60,31 @@ export default function CourseSearch({
       const matchesDept = !deptFilter || c.department === deptFilter || numPrefixes.includes(deptFilter.toUpperCase());
       return matchesSearch && matchesDept;
     });
+
+    // Rank: 0 = number starts with query (e.g. "CS" → "CS 1"),
+    //       1 = department matches query, 2 = anything else (name hit).
+    const rank = (c: Course): number => {
+      if (!q) return 0;
+      const numNoSpace = c.number.toLowerCase().replace(/\s+/g, '');
+      if (numNoSpace.startsWith(qNoSpace)) return 0;
+      const prefixes = c.number.split(/[\s/]/).map(s => s.toLowerCase());
+      if (prefixes.includes(q)) return 1;
+      return 2;
+    };
+
+    return matched.sort((a, b) => {
+      const r = rank(a) - rank(b);
+      if (r !== 0) return r;
+      if (a.department !== b.department) return a.department.localeCompare(b.department);
+      const ap = parseCourseNumber(a.number);
+      const bp = parseCourseNumber(b.number);
+      if (ap.num !== bp.num) return ap.num - bp.num;
+      return ap.suffix.localeCompare(bp.suffix);
+    });
   }, [search, deptFilter, allCourses]);
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const pageCourses = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-
-  const handleSearchChange = (val: string) => { setSearch(val); setPage(0); };
-  const handleDeptChange = (val: string) => { setDeptFilter(val); setPage(0); };
+  const handleSearchChange = (val: string) => { setSearch(val); };
+  const handleDeptChange = (val: string) => { setDeptFilter(val); };
 
   const depts = useMemo(
     () => [...new Set(allCourses.filter(c => !c.isCustom).map(c => c.department))].sort(),
@@ -126,7 +152,7 @@ export default function CourseSearch({
             <p>No courses found</p>
           </div>
         )}
-        {pageCourses.map(course => {
+        {filtered.map(course => {
           const scheduled = scheduledCourseIds.has(course.id);
           const deptColor = DEPT_COLORS[course.department] ?? '#64748b';
           return (
@@ -145,7 +171,9 @@ export default function CourseSearch({
               <div className="course-card-body">
                 <div className="course-card-top">
                   <span className="course-number" style={{ color: deptColor }}>{course.number}</span>
-                  <span className="course-units-pill">{course.units}u</span>
+                  <span className="course-units-pill">
+                    {course.units === 0 ? 'Var' : `${course.units}u`}
+                  </span>
                   {course.isCustom && (
                     <button
                       className="remove-custom-btn"
@@ -167,21 +195,6 @@ export default function CourseSearch({
         })}
       </div>
 
-      {totalPages > 1 && (
-        <div className="pagination-bar">
-          <button
-            className="page-btn"
-            onClick={() => setPage(p => Math.max(0, p - 1))}
-            disabled={page === 0}
-          >‹</button>
-          <span className="page-info">{page + 1} / {totalPages}</span>
-          <button
-            className="page-btn"
-            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-            disabled={page === totalPages - 1}
-          >›</button>
-        </div>
-      )}
     </aside>
   );
 }

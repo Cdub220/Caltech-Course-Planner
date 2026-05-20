@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import type { Course, Schedule, Term } from './types';
+import type { Course, Schedule, Term, UnitOverrides } from './types';
 import { MAJORS, MINORS } from './data/majorRequirements';
 import { useAuth } from './hooks/useAuth';
 import { saveSchedule, loadSchedule, fetchCourses } from './lib/db';
@@ -32,6 +32,7 @@ export default function App() {
   const [catalogCourses, setCatalogCourses] = useState<Course[]>([]);
   const [coursesLoading, setCoursesLoading] = useState(true);
   const [schedule, setSchedule] = useState<Schedule>(emptySchedule());
+  const [unitOverrides, setUnitOverrides] = useState<UnitOverrides>({});
   const [customCourses, setCustomCourses] = useState<Course[]>([]);
   const [selectedMajorId, setSelectedMajorId] = useState('');
   const [selectedMinorId, setSelectedMinorId] = useState('');
@@ -63,9 +64,10 @@ export default function App() {
     if (auth.status !== 'authed' || !auth.user) return;
     loadSchedule(auth.user.id).then(result => {
       if (!result.ok || !result.data) return;
-      const { schedule, customCourses: cc, major_id, minor_id, id } = result.data;
+      const { schedule, customCourses: cc, unitOverrides: uo, major_id, minor_id, id } = result.data;
       setSchedule(schedule);
       setCustomCourses(cc);
+      setUnitOverrides(uo);
       setSelectedMajorId(major_id ?? '');
       setSelectedMinorId(minor_id ?? '');
       setScheduleId(id);
@@ -77,6 +79,7 @@ export default function App() {
     if (auth.status === 'anon') {
       setSchedule(emptySchedule());
       setCustomCourses([]);
+      setUnitOverrides({});
       setSelectedMajorId('');
       setSelectedMinorId('');
       setScheduleId(undefined);
@@ -89,12 +92,12 @@ export default function App() {
   const isFirstRender = useRef(true);
 
   const triggerSave = useCallback(
-    (sched: Schedule, cc: Course[], majorId: string, minorId: string, sid: string | undefined) => {
+    (sched: Schedule, cc: Course[], uo: UnitOverrides, majorId: string, minorId: string, sid: string | undefined) => {
       if (!auth.user) return;
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       setSaveState('saving');
       saveTimerRef.current = setTimeout(async () => {
-        const result = await saveSchedule(auth.user!.id, sched, cc, majorId, minorId, sid);
+        const result = await saveSchedule(auth.user!.id, sched, cc, uo, majorId, minorId, sid);
         if (result.ok) {
           setScheduleId(result.id);
           setSaveState('saved');
@@ -110,14 +113,14 @@ export default function App() {
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return; }
     if (auth.status !== 'authed') return;
-    triggerSave(schedule, customCourses, selectedMajorId, selectedMinorId, scheduleId);
-  }, [schedule, customCourses, selectedMajorId, selectedMinorId]); // eslint-disable-line react-hooks/exhaustive-deps
+    triggerSave(schedule, customCourses, unitOverrides, selectedMajorId, selectedMinorId, scheduleId);
+  }, [schedule, customCourses, unitOverrides, selectedMajorId, selectedMinorId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleManualSave = () => {
     if (!auth.user) { setShowAuth(true); return; }
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     setSaveState('saving');
-    saveSchedule(auth.user.id, schedule, customCourses, selectedMajorId, selectedMinorId, scheduleId).then(result => {
+    saveSchedule(auth.user.id, schedule, customCourses, unitOverrides, selectedMajorId, selectedMinorId, scheduleId).then(result => {
       if (result.ok) {
         setScheduleId(result.id);
         setSaveState('saved');
@@ -157,6 +160,13 @@ export default function App() {
       updated[year] = yearTerms;
       return updated;
     });
+    // Drop any unit override for this slot/course.
+    setUnitOverrides(prev => {
+      if (!prev[year]?.[term]?.[courseId]) return prev;
+      const next = { ...prev, [year]: { ...prev[year], [term]: { ...prev[year][term] } } };
+      delete next[year][term][courseId];
+      return next;
+    });
   };
 
   const handleDrop = (toYear: string, toTerm: Term, payload: DragPayload) => {
@@ -173,6 +183,32 @@ export default function App() {
       if (!updated[toYear][toTerm].includes(courseId))
         updated[toYear][toTerm] = [...updated[toYear][toTerm], courseId];
       return updated;
+    });
+    // Move any unit override along with the course.
+    if (fromYear && fromTerm) {
+      setUnitOverrides(prev => {
+        const existing = prev[fromYear]?.[fromTerm]?.[courseId];
+        if (existing === undefined) return prev;
+        const next: UnitOverrides = {
+          ...prev,
+          [fromYear]: { ...prev[fromYear], [fromTerm]: { ...prev[fromYear][fromTerm] } },
+        };
+        delete next[fromYear][fromTerm][courseId];
+        next[toYear] = { ...(next[toYear] ?? {}) };
+        next[toYear][toTerm] = { ...(next[toYear][toTerm] ?? {}), [courseId]: existing };
+        return next;
+      });
+    }
+  };
+
+  const handleSetUnitOverride = (year: string, term: Term, courseId: string, units: number) => {
+    setUnitOverrides(prev => {
+      const next: UnitOverrides = {
+        ...prev,
+        [year]: { ...(prev[year] ?? {}), [term]: { ...(prev[year]?.[term] ?? {}) } },
+      };
+      next[year][term][courseId] = units;
+      return next;
     });
   };
 
@@ -269,8 +305,10 @@ export default function App() {
         <main className="schedule-main">
           <ScheduleGrid
             schedule={schedule}
+            unitOverrides={unitOverrides}
             onRemoveCourse={handleRemoveCourse}
             onDrop={handleDrop}
+            onSetUnitOverride={handleSetUnitOverride}
             highlightedCourses={highlightedCourses}
             dragPayload={dragPayload}
             onDragStart={setDragPayload}

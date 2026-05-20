@@ -95,19 +95,16 @@ create policy "courses_public_read"
 -- No explicit policy needed — service role bypasses RLS by default.
 
 -- ── Course sync schedule (pg_cron + pg_net) ───────────────────────
--- Run the sync Edge Function ~2 weeks before each Caltech term ends:
---   Feb 25  (Winter term ends ~Mar 13)
---   May 25  (Spring term ends ~Jun 7)
---   Nov 25  (Fall term ends ~Dec 10)
+-- Runs the sync Edge Function every Monday at 06:00 UTC.
 --
 -- Prerequisites: enable pg_cron and pg_net extensions in the Supabase dashboard
---   Dashboard → Database → Extensions → search "cron" and "http"
+--   Dashboard → Database → Extensions → search "cron" and "pg_net"
 --
 -- Replace YOUR_PROJECT_REF and YOUR_SERVICE_ROLE_KEY before running:
 --
 -- select cron.schedule(
---   'sync-courses-term',
---   '0 6 25 2,5,11 *',
+--   'sync-courses-weekly',
+--   '0 6 * * 1',
 --   $$
 --   select net.http_post(
 --     url     := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/sync-courses',
@@ -119,6 +116,11 @@ create policy "courses_public_read"
 --   );
 --   $$
 -- );
+--
+-- To inspect / remove the schedule later:
+--   select * from cron.job;                         -- list scheduled jobs
+--   select * from cron.job_run_details order by start_time desc limit 10;  -- last runs
+--   select cron.unschedule('sync-courses-weekly');  -- remove
 --
 -- Or trigger a one-time manual sync from your terminal:
 --   supabase functions invoke sync-courses --project-ref YOUR_PROJECT_REF

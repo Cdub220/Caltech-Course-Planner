@@ -25,6 +25,16 @@ export interface Schedule {
   };
 }
 
+// Per-slot unit overrides for variable-unit courses (research, thesis,
+// independent study). Key path: year → term → courseId → units the user chose.
+export interface UnitOverrides {
+  [year: string]: {
+    [term: string]: {
+      [courseId: string]: number;
+    };
+  };
+}
+
 export interface RequirementStatus {
   satisfied: boolean;
   courses: string[]; // course IDs that satisfy this

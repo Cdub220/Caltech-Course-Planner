@@ -1,16 +1,34 @@
 import { useState } from 'react';
-import type { Term, Schedule, Course } from '../types';
+import type { Term, Schedule, Course, UnitOverrides } from '../types';
 import type { DragPayload } from '../App';
 
 interface Props {
   schedule: Schedule;
+  unitOverrides: UnitOverrides;
   onRemoveCourse: (year: string, term: Term, courseId: string) => void;
   onDrop: (toYear: string, toTerm: Term, payload: DragPayload) => void;
+  onSetUnitOverride: (year: string, term: Term, courseId: string, units: number) => void;
   highlightedCourses?: Set<string>;
   dragPayload: DragPayload | null;
   onDragStart: (payload: DragPayload) => void;
   onDragEnd: () => void;
   allCourses: Course[];
+}
+
+// Default units shown for variable-unit (research/thesis) courses
+// when the user hasn't set their own value yet.
+const DEFAULT_VARIABLE_UNITS = 9;
+
+function effectiveUnits(
+  course: Course,
+  year: string,
+  term: Term,
+  overrides: UnitOverrides,
+): number {
+  const override = overrides[year]?.[term]?.[course.id];
+  if (override !== undefined) return override;
+  if (course.units === 0) return DEFAULT_VARIABLE_UNITS;
+  return course.units;
 }
 
 const YEARS = ['Freshman', 'Sophomore', 'Junior', 'Senior'] as const;
@@ -22,10 +40,16 @@ const TERM_COLORS: Record<Term, string> = {
   SP: '#15803d',
 };
 
-function termUnits(courseIds: string[], allCourses: Course[]): number {
+function termUnits(
+  courseIds: string[],
+  allCourses: Course[],
+  year: string,
+  term: Term,
+  overrides: UnitOverrides,
+): number {
   return courseIds.reduce((sum, id) => {
     const c = allCourses.find(x => x.id === id);
-    return sum + (c?.units ?? 0);
+    return sum + (c ? effectiveUnits(c, year, term, overrides) : 0);
   }, 0);
 }
 
@@ -44,8 +68,10 @@ interface TermCellProps {
   year: string;
   term: Term;
   courseIds: string[];
+  unitOverrides: UnitOverrides;
   onRemove: (id: string) => void;
   onDrop: (payload: DragPayload) => void;
+  onSetUnitOverride: (year: string, term: Term, courseId: string, units: number) => void;
   highlightedCourses?: Set<string>;
   isDragging: boolean;
   onDragStart: (payload: DragPayload) => void;
@@ -54,11 +80,12 @@ interface TermCellProps {
 }
 
 function TermCell({
-  year, term, courseIds, onRemove, onDrop,
+  year, term, courseIds, unitOverrides, onRemove, onDrop, onSetUnitOverride,
   highlightedCourses, isDragging, onDragStart, onDragEnd, allCourses,
 }: TermCellProps) {
   const [isOver, setIsOver] = useState(false);
-  const units = termUnits(courseIds, allCourses);
+  const [editingUnitsFor, setEditingUnitsFor] = useState<string | null>(null);
+  const units = termUnits(courseIds, allCourses, year, term, unitOverrides);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -80,11 +107,14 @@ function TermCell({
     if (!course) return null;
     const highlighted = highlightedCourses?.has(id);
     const deptColor = DEPT_COLORS[course.department] ?? '#64748b';
+    const isVariable = course.units === 0;
+    const shownUnits = effectiveUnits(course, year, term, unitOverrides);
+    const isEditing = editingUnitsFor === id;
     return (
       <div
         key={id}
         className={`scheduled-course ${highlighted ? 'highlighted' : ''}`}
-        draggable
+        draggable={!isEditing}
         onDragStart={e => {
           e.stopPropagation();
           e.dataTransfer.effectAllowed = 'copy';
@@ -97,7 +127,36 @@ function TermCell({
       >
         <span className="sc-dept-dot" style={{ background: deptColor }} />
         <span className="sc-number">{course.number}</span>
-        <span className="sc-units">{course.units}u</span>
+        {isVariable && isEditing ? (
+          <input
+            className="sc-units-input"
+            type="number"
+            min={0}
+            max={99}
+            autoFocus
+            defaultValue={shownUnits}
+            onClick={e => e.stopPropagation()}
+            onBlur={e => {
+              const v = parseInt(e.target.value, 10);
+              if (!Number.isNaN(v) && v >= 0) onSetUnitOverride(year, term, id, v);
+              setEditingUnitsFor(null);
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              if (e.key === 'Escape') setEditingUnitsFor(null);
+            }}
+          />
+        ) : isVariable ? (
+          <button
+            className="sc-units sc-units-editable"
+            title="Click to set units"
+            onClick={e => { e.stopPropagation(); setEditingUnitsFor(id); }}
+          >
+            {shownUnits}u
+          </button>
+        ) : (
+          <span className="sc-units">{shownUnits}u</span>
+        )}
         <button className="remove-btn" title="Remove" onClick={() => onRemove(id)}>×</button>
       </div>
     );
@@ -130,12 +189,16 @@ function TermCell({
 }
 
 export default function ScheduleGrid({
-  schedule, onRemoveCourse, onDrop,
+  schedule, unitOverrides, onRemoveCourse, onDrop, onSetUnitOverride,
   highlightedCourses, dragPayload, onDragStart, onDragEnd, allCourses,
 }: Props) {
-  const totalUnits = Object.values(schedule).reduce(
-    (sum, terms) => sum + Object.values(terms).reduce((s, ids) => s + termUnits(ids, allCourses), 0),
-    0
+  const totalUnits = Object.entries(schedule).reduce(
+    (sum, [year, terms]) =>
+      sum + Object.entries(terms).reduce(
+        (s, [term, ids]) => s + termUnits(ids, allCourses, year, term as Term, unitOverrides),
+        0,
+      ),
+    0,
   );
   const pct = Math.min((totalUnits / 486) * 100, 100);
   const isDragging = dragPayload !== null;
@@ -180,8 +243,10 @@ export default function ScheduleGrid({
                   year={year}
                   term={term}
                   courseIds={ids}
+                  unitOverrides={unitOverrides}
                   onRemove={id => onRemoveCourse(year, term, id)}
                   onDrop={payload => onDrop(year, term, payload)}
+                  onSetUnitOverride={onSetUnitOverride}
                   highlightedCourses={highlightedCourses}
                   isDragging={isDragging}
                   onDragStart={onDragStart}
