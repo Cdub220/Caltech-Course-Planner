@@ -45,12 +45,13 @@ export default function CourseSearch({
 }: Props) {
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
+  const [termFilter, setTermFilter] = useState<Term | ''>('');
   const [pickerCourseId, setPickerCourseId] = useState<string | null>(null);
   const [pickerYear, setPickerYear] = useState<string>('Freshman');
   const [pickerTerm, setPickerTerm] = useState<Term>('FA');
 
   const filtered = useMemo(() => {
-    if (!search && !deptFilter) return [];
+    if (!search && !deptFilter && !termFilter) return [];
     const q = search.toLowerCase().trim();
     const qNoSpace = q.replace(/\s+/g, '');
 
@@ -65,7 +66,8 @@ export default function CourseSearch({
         c.department.toLowerCase().includes(q);
       const numPrefixes = c.number.split(/[\s/]/).map(s => s.toUpperCase());
       const matchesDept = !deptFilter || c.department === deptFilter || numPrefixes.includes(deptFilter.toUpperCase());
-      return matchesSearch && matchesDept;
+      const matchesTerm = !termFilter || c.terms.includes(termFilter);
+      return matchesSearch && matchesDept && matchesTerm;
     });
 
     // Rank: 0 = number starts with query (e.g. "CS" → "CS 1"),
@@ -88,10 +90,11 @@ export default function CourseSearch({
       if (ap.num !== bp.num) return ap.num - bp.num;
       return ap.suffix.localeCompare(bp.suffix);
     });
-  }, [search, deptFilter, allCourses]);
+  }, [search, deptFilter, termFilter, allCourses]);
 
   const handleSearchChange = (val: string) => { setSearch(val); };
   const handleDeptChange = (val: string) => { setDeptFilter(val); };
+  const handleTermChange = (val: string) => { setTermFilter(val as Term | ''); };
 
   const depts = useMemo(
     () => [...new Set(allCourses.filter(c => !c.isCustom).map(c => c.department))].sort(),
@@ -105,7 +108,7 @@ export default function CourseSearch({
         <span className="search-count">
           {coursesLoading
             ? 'Loading…'
-            : search || deptFilter
+            : search || deptFilter || termFilter
               ? `${filtered.length} found`
               : `${allCourses.length} total`}
         </span>
@@ -135,6 +138,16 @@ export default function CourseSearch({
             <option key={d} value={d}>{d} – {DEPARTMENTS[d] ?? d}</option>
           ))}
         </select>
+        <select
+          className="dept-select"
+          value={termFilter}
+          onChange={e => handleTermChange(e.target.value)}
+        >
+          <option value="">All Terms</option>
+          {TERMS_ALL.map(t => (
+            <option key={t} value={t}>{TERM_LABELS[t]}</option>
+          ))}
+        </select>
       </div>
 
       <div className="drag-hint">
@@ -149,12 +162,12 @@ export default function CourseSearch({
         {coursesLoading && (
           <div className="no-results"><p>Loading course catalog…</p></div>
         )}
-        {!coursesLoading && !search && !deptFilter && (
+        {!coursesLoading && !search && !deptFilter && !termFilter && (
           <div className="no-results">
             <p>Search or filter by department to browse courses</p>
           </div>
         )}
-        {!coursesLoading && (search || deptFilter) && filtered.length === 0 && (
+        {!coursesLoading && (search || deptFilter || termFilter) && filtered.length === 0 && (
           <div className="no-results">
             <p>No courses found</p>
           </div>
