@@ -35,12 +35,19 @@ function parseCourseNumber(number: string): { num: number; suffix: string } {
   return { num: parseInt(match[1], 10), suffix: match[2].toLowerCase() };
 }
 
+const YEARS_ALL = ['Freshman', 'Sophomore', 'Junior', 'Senior'] as const;
+const TERMS_ALL: Term[] = ['FA', 'WI', 'SP'];
+const TERM_LABELS: Record<Term, string> = { FA: 'Fall', WI: 'Winter', SP: 'Spring' };
+
 export default function CourseSearch({
-  onAddCourse: _onAddCourse, scheduledCourseIds, onDragStart, onDragEnd,
+  onAddCourse, scheduledCourseIds, onDragStart, onDragEnd,
   allCourses, onOpenCustomModal, onRemoveCustomCourse, coursesLoading,
 }: Props) {
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
+  const [pickerCourseId, setPickerCourseId] = useState<string | null>(null);
+  const [pickerYear, setPickerYear] = useState<string>('Freshman');
+  const [pickerTerm, setPickerTerm] = useState<Term>('FA');
 
   const filtered = useMemo(() => {
     if (!search && !deptFilter) return [];
@@ -155,11 +162,14 @@ export default function CourseSearch({
         {filtered.map(course => {
           const scheduled = scheduledCourseIds.has(course.id);
           const deptColor = DEPT_COLORS[course.department] ?? '#64748b';
+          const pickerOpen = pickerCourseId === course.id;
+          // Default term selection to the first term the course is actually offered.
+          const availableTerms = course.terms.length > 0 ? course.terms : TERMS_ALL;
           return (
             <div
               key={course.id}
-              className={`course-card ${scheduled ? 'scheduled' : ''} ${course.isCustom ? 'custom-course-card' : ''}`}
-              draggable
+              className={`course-card ${scheduled ? 'scheduled' : ''} ${course.isCustom ? 'custom-course-card' : ''} ${pickerOpen ? 'picker-open' : ''}`}
+              draggable={!pickerOpen}
               onDragStart={e => {
                 e.dataTransfer.effectAllowed = 'copy';
                 e.dataTransfer.setData('text/plain', JSON.stringify({ courseId: course.id }));
@@ -189,7 +199,64 @@ export default function CourseSearch({
                   <span className="course-terms-small">{course.terms.join(' · ')}</span>
                   {scheduled && <span className="scheduled-badge">✓ Scheduled</span>}
                 </div>
+
+                {pickerOpen && (
+                  <div className="add-picker" onClick={e => e.stopPropagation()}>
+                    <select
+                      className="add-picker-select"
+                      value={pickerYear}
+                      onChange={e => setPickerYear(e.target.value)}
+                    >
+                      {YEARS_ALL.map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+                    <select
+                      className="add-picker-select"
+                      value={availableTerms.includes(pickerTerm) ? pickerTerm : availableTerms[0]}
+                      onChange={e => setPickerTerm(e.target.value as Term)}
+                    >
+                      {availableTerms.map(t => (
+                        <option key={t} value={t}>{TERM_LABELS[t]}</option>
+                      ))}
+                    </select>
+                    <button
+                      className="add-picker-confirm"
+                      onClick={() => {
+                        const term = availableTerms.includes(pickerTerm) ? pickerTerm : availableTerms[0];
+                        onAddCourse(course, pickerYear, term);
+                        setPickerCourseId(null);
+                      }}
+                    >
+                      Add
+                    </button>
+                    <button
+                      className="add-picker-cancel"
+                      title="Cancel"
+                      onClick={() => setPickerCourseId(null)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
               </div>
+
+              {!course.isCustom && (
+                <button
+                  className="course-card-add-btn"
+                  title={pickerOpen ? 'Close' : 'Add to schedule'}
+                  onClick={e => {
+                    e.stopPropagation();
+                    if (pickerOpen) {
+                      setPickerCourseId(null);
+                    } else {
+                      setPickerCourseId(course.id);
+                      const firstTerm = course.terms[0] ?? 'FA';
+                      setPickerTerm(firstTerm);
+                    }
+                  }}
+                >
+                  {pickerOpen ? '×' : '+'}
+                </button>
+              )}
             </div>
           );
         })}

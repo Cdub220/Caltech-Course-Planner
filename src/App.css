@@ -381,6 +381,7 @@ select, input { font-family: inherit; }
 
 /* Course card */
 .course-card {
+  position: relative;
   display: flex;
   align-items: stretch;
   flex-shrink: 0;
@@ -392,6 +393,82 @@ select, input { font-family: inherit; }
   transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
   user-select: none;
 }
+
+.course-card.picker-open {
+  cursor: default;
+  border-color: var(--orange, #E77500);
+  box-shadow: 0 0 0 2px rgba(231, 117, 0, 0.12);
+}
+.course-card.picker-open:active { transform: none; }
+
+/* Add-to-schedule button on right of card */
+.course-card-add-btn {
+  flex-shrink: 0;
+  align-self: stretch;
+  width: 30px;
+  border: none;
+  border-left: 1px solid var(--border);
+  background: #fafafa;
+  color: var(--text-2);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.course-card-add-btn:hover {
+  background: #fff7ed;
+  color: var(--orange, #E77500);
+}
+.course-card.picker-open .course-card-add-btn {
+  background: var(--orange, #E77500);
+  color: #fff;
+  border-left-color: var(--orange, #E77500);
+}
+
+/* Inline year/term picker shown below card content when add button is clicked */
+.add-picker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+}
+.add-picker-select {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  padding: 3px 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: #fff;
+  font-family: inherit;
+  cursor: pointer;
+}
+.add-picker-confirm {
+  font-size: 11px;
+  padding: 3px 8px;
+  border: none;
+  border-radius: 3px;
+  background: var(--orange, #E77500);
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+}
+.add-picker-confirm:hover { background: #c96400; }
+.add-picker-cancel {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.add-picker-cancel:hover { color: #ef4444; background: #fee2e2; }
 
 .course-card:hover {
   box-shadow: var(--shadow-sm);
