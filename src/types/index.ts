@@ -41,14 +41,31 @@ export interface RequirementStatus {
   needed?: string;
 }
 
+/**
+ * A "slot" represents one position in a requirement that must be filled by
+ * at least one course from `options`. Used to express AND-of-OR semantics:
+ * e.g. "CS 1 or CS 1x; CS 2; CS 3x" → three slots, each with its own options.
+ */
+export interface RequirementSlot {
+  name?: string;
+  options: string[];   // course IDs — student needs at least one of these
+  minUnits?: number;   // optional unit floor for this slot
+}
+
 export interface Requirement {
   id: string;
   name: string;
   description: string;
   units?: number;
-  courses?: string[]; // course IDs that can satisfy this
+  /** Flat list of course IDs that can satisfy this — counted by minCourses or minUnits. */
+  courses?: string[];
   minCourses?: number;
   minUnits?: number;
+  /** Departments that satisfy this requirement (e.g. "30 units in Ma/ACM/CS"). */
+  departments?: string[];
+  /** AND-of-OR: requirement is satisfied when EVERY slot has at least one match. */
+  slots?: RequirementSlot[];
+  /** OR-of-paths: requirement is satisfied when ANY one sub-requirement is satisfied. */
   subRequirements?: Requirement[];
   satisfied?: boolean;
 }
