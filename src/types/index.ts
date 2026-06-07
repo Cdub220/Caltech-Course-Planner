@@ -82,8 +82,23 @@ export interface CoreRequirementGroup {
   id: string;
   name: string;
   description?: string;
+  /** Unit floor for this requirement. */
   minUnits?: number;
+  /** Course-count floor (e.g. "3 writing-intensive courses"). */
+  minCourses?: number;
+  /** Explicit course IDs that satisfy this requirement. */
   courses?: string[];
+  /** AND-of-OR groups of course IDs, mirroring the legacy schema. */
   options?: string[][];
+  /** Department prefixes accepted (e.g. ['En','H','HPS'] for humanities). Matches
+   *  cross-listed prefixes too — "En/H 99" counts under En and H. */
+  departments?: string[];
+  /** Course-number floor (e.g. 90 for "advanced humanities"). The number part
+   *  is the leading integer of the course number, e.g. 99 in "En 99a". */
+  minNumber?: number;
+  /** Course-number ceiling (e.g. 60 for "freshman humanities"). */
+  maxNumber?: number;
+  /** Course IDs that should NEVER count, even if other filters match. */
+  excludeCourses?: string[];
   subGroups?: CoreRequirementGroup[];
 }
