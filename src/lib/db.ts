@@ -7,17 +7,27 @@
 import { supabase } from './supabase';
 import type { Schedule, Course, UnitOverrides } from '../types';
 
-/** Fetch the full course catalog from Supabase (populated by sync job). */
+/** Fetch the full course catalog from Supabase (populated by sync job).
+ *  Supabase REST defaults to a 1000-row cap per request, so we page in
+ *  1000-row chunks until exhausted. The catalog is ~1400 rows today. */
 export async function fetchCourses(): Promise<Course[]> {
-  const { data, error } = await supabase
-    .from('courses')
-    .select('id, number, name, units, terms, department')
-    .order('number');
-  if (error) {
-    console.error('fetchCourses error:', error.message);
-    return [];
+  const PAGE = 1000;
+  const out: Course[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('courses')
+      .select('id, number, name, units, terms, department')
+      .order('number')
+      .range(from, from + PAGE - 1);
+    if (error) {
+      console.error('fetchCourses error:', error.message);
+      return out;
+    }
+    const rows = (data ?? []) as Course[];
+    out.push(...rows);
+    if (rows.length < PAGE) break;
   }
-  return (data ?? []) as Course[];
+  return out;
 }
 
 export type SaveResult = { ok: true; id: string } | { ok: false; error: string };
